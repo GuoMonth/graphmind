@@ -168,26 +168,6 @@ SELECT DISTINCT n.* FROM nodes n JOIN deps d ON n.id = d.id;
 
 ---
 
-## CLI Output Format
+## CLI Design
 
-All CLI output is JSON by default, designed for AI agent consumption:
-
-```json
-{
-  "ok": true,
-  "data": { ... },
-  "error": null
-}
-```
-
-On error:
-
-```json
-{
-  "ok": false,
-  "data": null,
-  "error": { "code": "NOT_FOUND", "message": "Node #42 not found" }
-}
-```
-
-This ensures AI agents can reliably parse every response.
+See [CLI Specification](cli-spec.md) for the complete command reference and AI-friendly design principles.
