@@ -1,6 +1,10 @@
 # GraphMind
 
-> A local-first, AI-native project management CLI that models work as an evolving graph—turning raw context into structured tasks, relationships, and insights through conversational modeling.
+**为 AI Agent 原生打造的图式项目管理工具。**
+
+GraphMind 是一个 local-first 的项目管理 CLI，专为 Claude Code、Codex、Copilot 等 AI Agent 设计。它以图（graph）为底层数据结构，让 AI Agent 能够将用户的自然语言上下文转化为结构化的任务、关系和洞察。
+
+人不直接操作 GraphMind。人和 AI Agent 对话，AI Agent 调用 GraphMind 读写图。
 
 ---
 
