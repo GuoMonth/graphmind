@@ -158,8 +158,9 @@ Not pursuing in the current phase:
 
 | | |
 |---|---|
-| Language | Go |
+| Language | Go 1.26 |
 | Storage | SQLite |
+| Primary Keys | UUID v7 |
 | Interface | CLI (JSON I/O) |
 
 ---
