@@ -1,165 +1,166 @@
 # GraphMind
 
-**为 AI Agent 原生打造的图式项目管理工具。**
+**Graph-based project management, built natively for AI agents.**
 
-GraphMind 是一个 local-first 的项目管理 CLI，专为 [Claude Code](https://docs.anthropic.com/en/docs/claude-code)、[Codex](https://openai.com/index/codex/)、[Copilot](https://github.com/features/copilot) 等 AI Agent 设计。人不直接操作 GraphMind——人和 AI Agent 对话，AI Agent 调用 GraphMind 读写图。
+GraphMind is a local-first project management CLI designed for AI agents like [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex](https://openai.com/index/codex/), and [Copilot](https://github.com/features/copilot). Humans never touch GraphMind directly — they talk to an AI agent, and the AI agent uses GraphMind to read and write the graph.
 
-> _"我只需要描述发生了什么，系统就能帮我整理出我该做什么。"_
-
----
-
-## 为什么
-
-传统项目管理工具（Linear / Jira）为了让人类能直接操作，把项目简化成了表单 + 状态 + 看板。简化给人看没有错，**但不能在存储层就把真实结构丢掉**。
-
-真实项目是**多节点**（任务、决策、风险、发布）、**多关系**（依赖、阻塞、归因、拆解）、**持续演化**（认知不断修正）的——本质是一个**动态演化的图**。
-
-GraphMind 的做法：底层保留完整的图结构，由 AI Agent 梳理后再以人类可理解的方式呈现。
+> _"I just describe what's happening, and the system figures out what I need to do."_
 
 ---
 
-## 架构
+## Why
+
+Traditional project management tools (Linear, Jira) simplify projects into forms, statuses, and boards so humans can operate them directly. Simplification for presentation is fine — **but the underlying storage should not throw away the real structure**.
+
+Real projects have **many node types** (tasks, decisions, risks, releases), **many relationship types** (depends-on, blocks, decomposes-into, caused-by), and they **evolve continuously** as understanding changes. At their core, they are **dynamically evolving graphs**.
+
+GraphMind preserves the full graph underneath. AI agents process the complexity and present it to humans in digestible form.
+
+---
+
+## Architecture
 
 ```
-人（用户）
-  ↕  自然语言对话
-AI Agent（Claude Code / Codex / Copilot）
-  ↕  结构化命令 + JSON
-GraphMind CLI（gm）
-  ↕  读写
-Graph（SQLite）
+Human
+  ↕  natural language conversation
+AI Agent (Claude Code / Codex / Copilot)
+  ↕  structured commands + JSON
+GraphMind CLI (gm)
+  ↕  read / write
+Graph (SQLite)
 ```
 
-| 层 | 职责 |
+| Layer | Responsibility |
 |---|---|
-| **人** | 提供上下文、做决策、确认 proposal |
-| **AI Agent** | 对话、追问、结构化、生成 proposal、调用 CLI |
-| **GraphMind CLI** | 图的读写接口——结构化输入输出、行为可预测、机器可解析 |
-| **Graph** | 以图结构存储项目的完整真实关系 |
+| **Human** | Provide context, make decisions, confirm proposals |
+| **AI Agent** | Converse, ask follow-ups, extract structure, generate proposals, call CLI |
+| **GraphMind CLI** | Read/write interface to the graph — structured I/O, predictable behavior, machine-parseable |
+| **Graph** | Store the complete, real relationships of the project as a graph |
 
 ---
 
-## 工作流
+## Workflow
 
-以一个实际场景为例：
+A concrete example:
 
-**① 用户描述上下文**
-
-```
-用户: 我们决定把支付模块从单体里拆出来做微服务，
-      张三负责接口设计，李四负责数据迁移，
-      预计下周开始，依赖用户服务的认证接口先稳定下来。
-```
-
-**② AI Agent 追问，挖掘细节**
+**① Human provides context**
 
 ```
-AI: 拆分的目标版本是什么？有没有明确的截止时间？
-AI: "依赖认证接口稳定"——稳定的标准是什么？谁来判定？
+User: We've decided to extract the payment module from the monolith into
+      a microservice. Alice owns the API design, Bob owns the data migration.
+      Starting next week — blocked on the auth service API being stable first.
 ```
 
-**③ AI Agent 调用 CLI 查图，关联已有信息**
+**② AI agent asks follow-up questions**
+
+```
+AI: What's the target version for the split? Is there a hard deadline?
+AI: "Blocked on auth API being stable" — what does stable mean here? Who decides?
+```
+
+**③ AI agent queries the graph via CLI**
 
 ```bash
-$ gm query --related "认证接口" --format json
+$ gm query --related "auth API" --format json
 ```
 
 ```
-AI: 图中已有"认证接口重构"（#42），进行中，负责人王五。
-    你说的依赖是指这个任务吗？
+AI: The graph already has "Auth API refactor" (#42), in progress, owned by
+    Charlie. Is that the dependency you're referring to?
 ```
 
-**④ AI Agent 生成 Proposal，调用 CLI 写入**
+**④ AI agent generates a proposal via CLI**
 
 ```bash
 $ gm proposal create --format json << 'EOF'
 {
   "nodes": [
-    {"title": "支付模块微服务化", "type": "epic"},
-    {"title": "支付接口设计", "type": "task", "assignee": "张三"},
-    {"title": "支付数据迁移", "type": "task", "assignee": "李四"}
+    {"title": "Payment microservice extraction", "type": "epic"},
+    {"title": "Payment API design", "type": "task", "assignee": "Alice"},
+    {"title": "Payment data migration", "type": "task", "assignee": "Bob"}
   ],
   "edges": [
-    {"from": "支付模块微服务化", "to": "支付接口设计", "type": "decompose"},
-    {"from": "支付模块微服务化", "to": "支付数据迁移", "type": "decompose"},
-    {"from": "支付数据迁移", "to": "#42", "type": "depends_on"}
+    {"from": "Payment microservice extraction", "to": "Payment API design", "type": "decompose"},
+    {"from": "Payment microservice extraction", "to": "Payment data migration", "type": "decompose"},
+    {"from": "Payment data migration", "to": "#42", "type": "depends_on"}
   ]
 }
 EOF
 ```
 
-AI Agent 将结果翻译为人话：
+The AI agent presents the result in human-readable form:
 
 ```
-AI: 计划创建以下结构：
-    📦 支付模块微服务化 (epic)
-     ├── 支付接口设计 (张三)
-     └── 支付数据迁移 (李四) → 依赖 #42 认证接口重构
-    确认写入吗？
+AI: Here's what I'll create:
+    📦 Payment microservice extraction (epic)
+     ├── Payment API design (Alice)
+     └── Payment data migration (Bob) → depends on #42 Auth API refactor
+    Shall I commit this?
 ```
 
-**⑤ 用户确认，Commit**
+**⑤ Human confirms, commit**
 
 ```bash
 $ gm proposal commit <proposal-id>
 ```
 
-**⑥ 持续演化**
+**⑥ Continuous evolution**
 
 ```
-用户: 张三说接口设计完成了，但发现需要一个新的网关层。
+User: Alice says the API design is done, but we discovered we need
+      a new gateway layer — that wasn't planned for.
 ```
 
-AI Agent 再次调用 CLI 更新状态、创建新节点、调整关系——生成新的 proposal，循环往复。
+The AI agent calls the CLI again to update statuses, create new nodes, adjust relationships — generating a new proposal for confirmation. The cycle repeats.
 
 ---
 
-## 设计原则
+## Design Principles
 
-| 原则 | 含义 |
+| Principle | Meaning |
 |---|---|
-| **Graph-first** | 项目数据以图结构存储，不提前压缩为表单、列表或看板 |
-| **Proposal-first** | 所有变更先生成 proposal，用户确认后才写入，防止错误建模污染系统 |
-| **Event-sourced** | 所有变更以事件记录，当前状态由事件投影得到，支持回溯与演化分析 |
-| **Evolving Graph** | 图持续演化——支持补充、修正、拆分、合并、重归类 |
-| **CLI-as-Tool** | CLI 是 AI Agent 的工具接口，不是人的操作界面。结构化 I/O，行为可预测 |
-| **Local-first** | 默认本地运行（SQLite），零配置，单用户优先 |
+| **Graph-first** | Project data is stored as a graph. Never flattened into forms, lists, or boards at the storage layer |
+| **Proposal-first** | All changes are staged as proposals. Only committed after human confirmation. Prevents bad modeling from polluting the system |
+| **Event-sourced** | All mutations are recorded as events. Current state is derived by projection. Supports retrospection and evolution analysis |
+| **Evolving Graph** | The graph is never "done". Supports enrichment, correction, splitting, merging, and reclassification |
+| **CLI-as-Tool** | The CLI is a tool interface for AI agents, not a UI for humans. Structured I/O, predictable behavior |
+| **Local-first** | Runs locally by default (SQLite). Zero config. Single-user first |
 
 ---
 
-## AI 的角色
+## Role of AI
 
-AI Agent 不负责决策，负责处理人无法直观驾驭的复杂图关系：
+AI agents don't make decisions. They handle the graph complexity that humans can't manage visually:
 
-- **结构化** — 从自然语言中提取节点和关系
-- **关联** — 将新信息与已有图节点建立连接
-- **校验** — 检查图的一致性（循环依赖、缺失关系等）
-- **投影** — 将复杂图关系整理为人可理解的视图
-- **压缩** — 对大规模图信息做摘要
+- **Extract** — pull structured nodes and relationships from natural language
+- **Link** — connect new information to existing graph nodes
+- **Validate** — check graph consistency (circular deps, missing links, etc.)
+- **Project** — transform complex graph relationships into human-readable views
+- **Compress** — summarize large-scale graph information
 
-> AI 是"复杂性整流器"，不是"项目管理者"。
-
----
-
-## 非目标
-
-当前阶段不追求：
-
-- 企业级权限系统
-- 复杂审批流程
-- Web UI / 重前端体验
-- 完整替代 Linear / Jira
-- 通用图数据库
+> AI is a "complexity rectifier", not a "project manager".
 
 ---
 
-## 技术栈
+## Non-goals
+
+Not pursuing in the current phase:
+
+- Enterprise permission systems
+- Complex approval workflows
+- Web UI / frontend-heavy experience
+- Full replacement for Linear or Jira
+- General-purpose graph database
+
+---
+
+## Tech Stack
 
 | | |
 |---|---|
-| 语言 | Go |
-| 存储 | SQLite |
-| 接口 | CLI（JSON I/O） |
+| Language | Go |
+| Storage | SQLite |
+| Interface | CLI (JSON I/O) |
 
 ---
 
