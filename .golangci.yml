@@ -1,0 +1,113 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: none
+  enable:
+    # Bug detection
+    - errcheck          # Unchecked errors
+    - govet             # Go vet checks
+    - staticcheck       # Advanced static analysis
+    - gosimple          # Code simplifications
+    - ineffassign       # Ineffectual assignments
+    - unused            # Unused code
+
+    # Resource safety
+    - bodyclose         # HTTP response body must be closed
+    - noctx             # HTTP requests must use context
+    - sqlclosecheck     # SQL rows/statements must be closed
+    - rowserrcheck      # sql.Rows.Err() must be checked
+    - durationcheck     # Correct time.Duration multiplication
+
+    # Type safety
+    - asasalint         # Restrict ...any variadic params
+
+    # Code quality
+    - revive            # Opinionated Go style rules
+    - gocritic          # Diagnostic + style + performance checks
+    - unconvert         # Unnecessary type conversions
+    - unparam           # Unused function parameters
+    - nakedret          # Naked returns in long functions
+    - misspell          # Spelling mistakes in comments/strings
+    - whitespace        # Leading/trailing whitespace in functions
+
+    # Complexity control
+    - gocyclo           # Function cyclomatic complexity
+    - cyclop            # Package-level cyclomatic complexity
+    - funlen            # Function length (lines + statements)
+    - lll               # Line length limit
+
+  exclusions:
+    presets:
+      - comments
+    rules:
+      # Relax rules for test files
+      - path: _test\.go
+        linters:
+          - funlen
+          - cyclop
+          - lll
+          - errcheck
+
+settings:
+  # Complexity
+  gocyclo:
+    min-complexity: 15
+  cyclop:
+    max-complexity: 15
+    skip-tests: true
+  funlen:
+    lines: 80
+    statements: 50
+    ignore-comments: true
+  lll:
+    line-length: 140
+    tab-width: 4
+  nakedret:
+    max-func-lines: 30
+
+  # Code quality
+  revive:
+    rules:
+      - name: exported
+      - name: var-naming
+      - name: blank-imports
+      - name: context-as-argument
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: increment-decrement
+      - name: var-declaration
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unreachable-code
+      - name: redefines-builtin-id
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+  misspell:
+    locale: US
+  errcheck:
+    exclude-functions:
+      - (*os.File).Close
+      - (io.Closer).Close
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

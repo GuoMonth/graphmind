@@ -53,7 +53,13 @@ graphmind/
 │       ├── event.go             # gm event list
 │       ├── schema.go            # gm schema
 │       └── output.go            # JSON envelope helpers
+├── scripts/
+│   ├── pre-commit.sh            # Git pre-commit hook
+│   ├── pre-push.sh              # Git pre-push hook
+│   └── setup-hooks.sh           # Install hooks to .git/hooks/
 ├── docs/
+├── .golangci.yml                # golangci-lint v2 configuration
+├── Makefile                     # Build, test, lint, setup commands
 ├── go.mod
 ├── go.sum
 ├── README.md
@@ -80,6 +86,12 @@ graphmind/
 | `modernc.org/sqlite` | SQLite driver (pure Go, no CGO) | latest |
 | `github.com/google/uuid` | UUID v7 generation | latest |
 | `github.com/spf13/cobra` | CLI framework | latest |
+
+### Dev tools
+
+| Tool | Purpose | Version |
+|---|---|---|
+| `golangci-lint` | Linter aggregator | v2.9.0+ (Go 1.26 support) |
 
 ### Rules
 
@@ -322,8 +334,11 @@ func TestNodeCreate(t *testing.T) {
 
 ## Code Style
 
+> See also: `engineering-standards.md` for workflow, linting config, quality gates, and git hooks.
+
 - Follow `gofmt` and `go vet`. No exceptions.
 - Run `go fix` for modernization.
+- **No `any` abuse.** See `engineering-standards.md` → "The `any` Restriction" for the full rule. Briefly: `any` is banned by default; only allowed in JSON properties, `database/sql` scanning, generic constraints, and third-party interfaces — always with a justifying comment.
 - No globals except sentinel errors.
 - Context (`context.Context`) as first parameter for all service-layer functions.
 - Return `(result, error)`, never `panic` for business logic.

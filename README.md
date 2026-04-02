@@ -159,9 +159,11 @@ Not pursuing in the current phase:
 | | |
 |---|---|
 | Language | Go 1.26 |
-| Storage | SQLite |
+| Storage | SQLite (via `modernc.org/sqlite`, pure Go) |
 | Primary Keys | UUID v7 |
 | Interface | CLI (JSON I/O) |
+| Linting | golangci-lint v2 |
+| Quality gates | Git hooks (pre-commit, pre-push) |
 
 ---
 
