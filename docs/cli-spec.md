@@ -180,13 +180,19 @@ $ echo '{"type":"depends_on","from_id":"<uuid>","to_id":"<uuid>"}' | gm edge cre
 
 Returns error with code `CONFLICT` if this would create a circular dependency (checked at creation time).
 
+### `gm edge get`
+
+```bash
+$ gm edge get --id <uuid>
+```
+
 ### `gm edge list`
 
 ```bash
-$ gm edge list --from <uuid>
-$ gm edge list --to <uuid>
+$ gm edge list --from-id <uuid>
+$ gm edge list --to-id <uuid>
 $ gm edge list --type depends_on
-$ gm edge list --node <uuid>          # edges in either direction
+$ gm edge list --node-id <uuid>          # edges in either direction
 ```
 
 ### `gm edge delete`
@@ -209,15 +215,15 @@ $ cat << 'EOF' | gm proposal create
     {"action": "create_node", "data": {"type": "epic", "title": "Payment microservice extraction"}},
     {"action": "create_node", "data": {"type": "task", "title": "Payment API design", "properties": {"assignee": "Alice"}}},
     {"action": "create_node", "data": {"type": "task", "title": "Payment data migration", "properties": {"assignee": "Bob"}}},
-    {"action": "create_edge", "data": {"type": "decompose", "from_ref": 0, "to_ref": 1}},
-    {"action": "create_edge", "data": {"type": "decompose", "from_ref": 0, "to_ref": 2}},
-    {"action": "create_edge", "data": {"type": "depends_on", "from_ref": 2, "to_id": "0192d4e5-7a2b-7000-8000-00000000002a"}}
+    {"action": "create_edge", "data": {"type": "decompose", "from_reference": 0, "to_reference": 1}},
+    {"action": "create_edge", "data": {"type": "decompose", "from_reference": 0, "to_reference": 2}},
+    {"action": "create_edge", "data": {"type": "depends_on", "from_reference": 2, "to_id": "0192d4e5-7a2b-7000-8000-00000000002a"}}
   ]
 }
 EOF
 ```
 
-**Note:** `from_ref` / `to_ref` reference nodes by their index in the `operations` array (for nodes created within the same proposal). `from_id` / `to_id` reference existing nodes by UUID.
+**Note:** `from_reference` / `to_reference` reference nodes by their index in the `operations` array (for nodes created within the same proposal). `from_id` / `to_id` reference existing nodes by UUID.
 
 ```json
 {
@@ -281,8 +287,8 @@ Search nodes by keyword (FTS5), tag, or property filter. Optionally expand the n
 # Full-text keyword search (FTS5)
 $ gm graph query --keyword "payment"
 
-# Filter by tag
-$ gm graph query --tag "payment-module"
+# Filter by tag name
+$ gm graph query --tag-name "payment-module"
 
 # Filter by property
 $ gm graph query --filter '$.assignee == "Alice"' --type task
@@ -291,7 +297,7 @@ $ gm graph query --filter '$.assignee == "Alice"' --type task
 $ gm graph query --keyword "payment" --expand 2
 
 # Tag + expand
-$ gm graph query --tag "auth" --expand 1
+$ gm graph query --tag-name "auth" --expand 1
 ```
 
 When `--expand N` is provided, the result includes the matched nodes **plus** all nodes and edges within N hops:
@@ -312,14 +318,14 @@ When `--expand N` is provided, the result includes the matched nodes **plus** al
 Traverse the graph from a starting node.
 
 ```bash
-$ gm graph traverse --from <uuid> --direction out --edge-type depends_on --depth 3
+$ gm graph traverse --from-id <uuid> --direction outgoing --edge-type depends_on --max-depth 3
 ```
 
 ```json
 {
   "ok": true,
   "data": {
-    "root": "0192d4e5-7a2b-7000-8000-000000000001",
+    "root_id": "0192d4e5-7a2b-7000-8000-000000000001",
     "nodes": [ ... ],
     "edges": [ ... ],
     "depth_reached": 2
@@ -407,7 +413,7 @@ Deleting a tag removes all node_tags associations but does not delete the nodes.
 Associate a tag with a node.
 
 ```bash
-$ echo '{"tag_id":"<tag-uuid>"}' | gm node tag --id <node-uuid>
+$ gm node tag --id <node-uuid> --tag-id <tag-uuid>
 ```
 
 ### `gm node untag`
@@ -415,7 +421,7 @@ $ echo '{"tag_id":"<tag-uuid>"}' | gm node tag --id <node-uuid>
 Remove a tag from a node.
 
 ```bash
-$ gm node untag --id <node-uuid> --tag <tag-uuid>
+$ gm node untag --id <node-uuid> --tag-id <tag-uuid>
 ```
 
 ---

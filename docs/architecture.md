@@ -31,7 +31,7 @@ GraphMind is an AI-agent-native, local-first project management tool. The core t
 │         │                   │                      │            │
 ├─────────┴───────────────────┴──────────────────────┴────────────┤
 │                       Domain Model                              │
-│  Node, Edge, Event, Proposal — pure Go structs, no DB imports   │
+│  Node, Edge, Tag, Event, Proposal — pure Go structs, no DB imports  │
 ├─────────────────────────────────────────────────────────────────┤
 │                      Database Layer                              │
 │  Connection management, PRAGMAs, migrations, sql.DB pool        │
@@ -60,10 +60,11 @@ cmd/gm/main.go
   └─→ internal/cli          ← cobra commands, JSON I/O
         │
         ├─→ internal/graph       ← GraphService (node/edge CRUD, traversal, validation)
+        ├─→ internal/tag         ← TagService (tag CRUD, FTS5 search)
         ├─→ internal/proposal    ← ProposalService (create, validate, commit, reject)
         └─→ internal/event       ← EventService (append, query)
               │
-              └─→ internal/model     ← pure domain types (Node, Edge, Event, Proposal)
+              └─→ internal/model     ← pure domain types (Node, Edge, Tag, Event, Proposal)
                     (no deps)
 
         All services also depend on:
@@ -74,9 +75,10 @@ cmd/gm/main.go
 ### Dependency flow (strict, enforced by `internal/`)
 
 ```
-cli → graph, proposal, event
+cli → graph, tag, proposal, event
 graph → model, db, event
-proposal → model, db, event, graph
+tag → model, db, event
+proposal → model, db, event, graph, tag
 event → model, db
 model → (nothing)
 db → (nothing)
@@ -300,7 +302,7 @@ AI Agent receives new input from human
   ├─ Step 1: gm tag search --keyword "payment"
   │    → Find relevant tags
   │
-  ├─ Step 2: gm graph query --tag "payment-module" --expand 2
+  ├─ Step 2: gm graph query --tag-name "payment-module" --expand 2
   │    → Find all nodes with this tag + 2-hop neighborhood
   │
   ├─ Step 3: gm graph query --keyword "migration deadline"
@@ -334,17 +336,17 @@ All traversal uses SQLite `WITH RECURSIVE` CTEs. The Go code constructs the appr
 
 ```go
 type TraverseInput struct {
-    FromID    string   // starting node
-    Direction string   // "out" | "in" | "both"
+    FromID    string   // starting node UUID
+    Direction string   // "outgoing" | "incoming" | "both"
     EdgeTypes []string // filter by edge type(s), empty = all
     MaxDepth  int      // 0 = unlimited (with cycle protection)
 }
 
 type TraverseResult struct {
-    Root  string       // starting node ID
-    Nodes []model.Node // all reached nodes
-    Edges []model.Edge // all traversed edges
-    Depth int          // actual depth reached
+    RootID string       // starting node ID
+    Nodes  []model.Node // all reached nodes
+    Edges  []model.Edge // all traversed edges
+    Depth  int          // actual depth reached
 }
 ```
 
@@ -387,8 +389,8 @@ type GraphService interface {
     UntagNode(ctx context.Context, nodeID string, tagID string) error
 
     // Graph-level
-    Query(ctx context.Context, input model.QueryInput) (model.QueryResult, error)
-    Traverse(ctx context.Context, input model.TraverseInput) (model.TraverseResult, error)
+    Query(ctx context.Context, input model.GraphQueryInput) (model.GraphQueryResult, error)
+    Traverse(ctx context.Context, input model.GraphTraverseInput) (model.GraphTraverseResult, error)
     Stats(ctx context.Context) (model.GraphStats, error)
 }
 
@@ -407,7 +409,7 @@ type ProposalService interface {
     Create(ctx context.Context, input model.CreateProposalInput) (model.Proposal, error)
     Get(ctx context.Context, id string) (model.Proposal, error)
     List(ctx context.Context, filter model.ProposalFilter) ([]model.Proposal, error)
-    Commit(ctx context.Context, id string) (model.CommitResult, error)
+    Commit(ctx context.Context, id string) (model.ProposalCommitResult, error)
     Reject(ctx context.Context, id string) error
 }
 

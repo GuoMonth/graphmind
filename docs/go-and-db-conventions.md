@@ -32,6 +32,7 @@ graphmind/
 │   ├── model/
 │   │   ├── node.go              # Node struct + methods
 │   │   ├── edge.go              # Edge struct + methods
+│   │   ├── tag.go               # Tag struct + methods
 │   │   ├── event.go             # Event struct + methods
 │   │   └── proposal.go          # Proposal struct + methods
 │   ├── graph/
@@ -48,6 +49,7 @@ graphmind/
 │       ├── root.go              # Root command setup
 │       ├── node.go              # gm node <action>
 │       ├── edge.go              # gm edge <action>
+│       ├── tag.go               # gm tag <action>
 │       ├── proposal.go          # gm proposal <action>
 │       ├── graph.go             # gm graph <action>
 │       ├── event.go             # gm event list
