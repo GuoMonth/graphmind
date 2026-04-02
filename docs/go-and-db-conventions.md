@@ -38,6 +38,8 @@ graphmind/
 │   │   ├── store.go             # Graph read/write operations
 │   │   ├── traverse.go          # Traversal queries
 │   │   └── validate.go          # Cycle detection, consistency checks
+│   ├── tag/
+│   │   └── store.go             # Tag CRUD + FTS5 search
 │   ├── proposal/
 │   │   └── service.go           # Proposal create/commit/reject logic
 │   ├── event/
@@ -65,7 +67,7 @@ graphmind/
 - `internal/cli/` — command handlers. Parse flags, call services, format output.
 - `internal/model/` — domain types. No database imports.
 - `internal/db/` — database connection and migrations only.
-- `internal/graph/`, `internal/proposal/`, `internal/event/` — service layer. Depends on `model/` and `db/`.
+- `internal/graph/`, `internal/tag/`, `internal/proposal/`, `internal/event/` — service layer. Depends on `model/` and `db/`.
 
 ---
 
@@ -238,6 +240,27 @@ CREATE TABLE proposals (
     committed_at  TEXT
 );
 CREATE INDEX idx_proposals_status ON proposals(status);
+
+-- Tags (AI-extracted semantic anchors)
+CREATE TABLE tags (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL UNIQUE,
+    description TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+
+-- Node ↔ Tag (many-to-many)
+CREATE TABLE node_tags (
+    node_id  TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+    tag_id   TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (node_id, tag_id)
+);
+CREATE INDEX idx_node_tags_tag_id ON node_tags(tag_id);
+
+-- Full-text search (FTS5)
+CREATE VIRTUAL TABLE nodes_fts USING fts5(title, properties, content='nodes', content_rowid='rowid');
+CREATE VIRTUAL TABLE tags_fts USING fts5(name, description, content='tags', content_rowid='rowid');
 
 -- Schema version tracking
 CREATE TABLE schema_version (

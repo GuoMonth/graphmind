@@ -75,8 +75,9 @@ gm <resource> <action> [flags] [< stdin]
 
 | Resource | Actions | Description |
 |---|---|---|
-| `node` | `create`, `get`, `list`, `update`, `delete` | Graph nodes |
+| `node` | `create`, `get`, `list`, `update`, `delete`, `tag`, `untag` | Graph nodes |
 | `edge` | `create`, `get`, `list`, `delete` | Graph edges (relationships) |
+| `tag` | `create`, `get`, `list`, `update`, `delete`, `search` | AI-extracted semantic tags |
 | `proposal` | `create`, `get`, `list`, `commit`, `reject` | Staged change proposals |
 | `event` | `list` | Event log (read-only) |
 | `graph` | `query`, `traverse`, `stats` | Graph-level operations |
@@ -274,11 +275,36 @@ $ gm proposal reject --id <uuid>
 
 ### `gm graph query`
 
-Search nodes and edges by keyword or property.
+Search nodes by keyword (FTS5), tag, or property filter. Optionally expand the neighborhood.
 
 ```bash
+# Full-text keyword search (FTS5)
 $ gm graph query --keyword "payment"
+
+# Filter by tag
+$ gm graph query --tag "payment-module"
+
+# Filter by property
 $ gm graph query --filter '$.assignee == "Alice"' --type task
+
+# Combine: search + expand neighborhood (most common AI agent pattern)
+$ gm graph query --keyword "payment" --expand 2
+
+# Tag + expand
+$ gm graph query --tag "auth" --expand 1
+```
+
+When `--expand N` is provided, the result includes the matched nodes **plus** all nodes and edges within N hops:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "matched": [ ... ],
+    "expanded_nodes": [ ... ],
+    "expanded_edges": [ ... ]
+  }
+}
 ```
 
 ### `gm graph traverse`
@@ -320,6 +346,76 @@ $ gm graph stats
     "open_proposals": 2
   }
 }
+```
+
+---
+
+### `gm tag create`
+
+Create a tag with a name and description (typically AI-generated).
+
+```bash
+$ echo '{"name":"payment-module","description":"Everything related to the payment microservice extraction project"}' | gm tag create
+```
+
+```json
+{
+  "ok": true,
+  "data": {
+    "id": "0192d4e5-9f1a-7000-8000-000000000020",
+    "name": "payment-module",
+    "description": "Everything related to the payment microservice extraction project",
+    "created_at": "2026-04-02T07:20:00Z",
+    "updated_at": "2026-04-02T07:20:00Z"
+  }
+}
+```
+
+### `gm tag list`
+
+```bash
+$ gm tag list
+$ gm tag list --limit 20
+```
+
+### `gm tag search`
+
+Search tags by keyword (FTS5 on tag name + description).
+
+```bash
+$ gm tag search --keyword "payment"
+```
+
+### `gm tag update`
+
+Update tag name or description.
+
+```bash
+$ echo '{"description":"Updated description with more context"}' | gm tag update --id <uuid>
+```
+
+### `gm tag delete`
+
+```bash
+$ gm tag delete --id <uuid>
+```
+
+Deleting a tag removes all node_tags associations but does not delete the nodes.
+
+### `gm node tag`
+
+Associate a tag with a node.
+
+```bash
+$ echo '{"tag_id":"<tag-uuid>"}' | gm node tag --id <node-uuid>
+```
+
+### `gm node untag`
+
+Remove a tag from a node.
+
+```bash
+$ gm node untag --id <node-uuid> --tag <tag-uuid>
 ```
 
 ---

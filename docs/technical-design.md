@@ -105,6 +105,39 @@ CREATE TABLE proposals (
 CREATE INDEX idx_proposals_status ON proposals(status);
 ```
 
+### Tags (AI-extracted semantic anchors)
+
+Tags are named concepts that AI extracts from node content. Nodes sharing tags are implicitly related.
+
+```sql
+CREATE TABLE tags (
+    id          TEXT PRIMARY KEY,   -- UUID v7
+    name        TEXT NOT NULL UNIQUE,
+    description TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL,      -- ISO 8601
+    updated_at  TEXT NOT NULL       -- ISO 8601
+);
+
+CREATE TABLE node_tags (
+    node_id  TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+    tag_id   TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (node_id, tag_id)
+);
+
+CREATE INDEX idx_node_tags_tag_id ON node_tags(tag_id);
+```
+
+### Full-Text Search (FTS5)
+
+SQLite FTS5 virtual tables for keyword search across nodes and tags:
+
+```sql
+CREATE VIRTUAL TABLE nodes_fts USING fts5(title, properties, content='nodes', content_rowid='rowid');
+CREATE VIRTUAL TABLE tags_fts USING fts5(name, description, content='tags', content_rowid='rowid');
+```
+
+FTS5 tables are kept in sync with projection tables on every write.
+
 ---
 
 ## Key Design Decisions

@@ -202,6 +202,11 @@ Key properties:
 | `node_deleted` | Node ID + last snapshot |
 | `edge_created` | Full edge snapshot |
 | `edge_deleted` | Edge ID + last snapshot |
+| `tag_created` | Full tag snapshot |
+| `tag_updated` | Tag ID + changed fields |
+| `tag_deleted` | Tag ID + last snapshot |
+| `node_tagged` | Node ID + Tag ID |
+| `node_untagged` | Node ID + Tag ID |
 | `proposal_created` | Proposal ID + description |
 | `proposal_committed` | Proposal ID + list of operation event IDs |
 | `proposal_rejected` | Proposal ID + reason (optional) |
@@ -234,6 +239,90 @@ If projections are ever corrupted, they can be rebuilt:
 ```
 
 This is a **disaster recovery** path, not a normal operation. The `gm` CLI may expose this as `gm graph rebuild` in the future.
+
+---
+
+## Search & Association Model
+
+GraphMind uses a three-layer association model — from coarse to precise:
+
+```
+Layer 1: Tags (low cost, medium signal)
+  AI extracts tags → nodes share tags → implicit clustering
+
+Layer 2: Explicit Edges (high cost, strong signal)
+  AI infers typed relationships → depends_on, blocks, decompose, ...
+
+Layer 3: AI Semantic Understanding (zero cost, broad but weak)
+  AI reads node content at query time → deeper reasoning
+```
+
+| Layer | Cost to build | Signal strength | Who builds it | Used for |
+|---|---|---|---|---|
+| **Tags** | Low (AI auto-extracts) | Medium (thematic clustering) | AI, auto | Search entry point, grouping, discovery |
+| **Edges** | High (infer type + direction) | Strong (precise structural relationship) | AI + human confirm | Dependency analysis, task decomposition |
+| **Semantic** | None (content itself) | Broad but weak | AI at query time | Deep association discovery |
+
+### Tags
+
+Tags are **AI-extracted semantic anchors** — named concepts that recur across the project.
+
+- Each tag has a `name` and a `description` (both AI-generated, evolving over time)
+- Nodes can have multiple tags (many-to-many via `node_tags`)
+- Two nodes sharing a tag are **implicitly related** without an explicit edge
+- Tags create O(N) relationships vs O(N²) explicit edges — scalable
+
+Tag lifecycle:
+1. AI extracts candidate tags from user input
+2. AI checks existing tags via `gm tag search` — reuse before creating new
+3. New tags go through proposal mechanism
+4. AI periodically merges synonymous tags (e.g., "payment" + "payments" → "payment")
+
+### Full-Text Search (FTS5)
+
+SQLite FTS5 powers keyword search across nodes and tags:
+
+```sql
+-- Node search (title + properties)
+CREATE VIRTUAL TABLE nodes_fts USING fts5(title, properties, content='nodes', content_rowid='rowid');
+
+-- Tag search (name + description)
+CREATE VIRTUAL TABLE tags_fts USING fts5(name, description, content='tags', content_rowid='rowid');
+```
+
+FTS5 is kept in sync with projection tables via triggers or application-level writes.
+
+### Search Flow (how AI agents find context)
+
+```
+AI Agent receives new input from human
+  │
+  ├─ Step 1: gm tag search --keyword "payment"
+  │    → Find relevant tags
+  │
+  ├─ Step 2: gm graph query --tag "payment-module" --expand 2
+  │    → Find all nodes with this tag + 2-hop neighborhood
+  │
+  ├─ Step 3: gm graph query --keyword "migration deadline"
+  │    → FTS5 keyword search for more specific matches
+  │
+  ├─ Step 4: (AI reasoning) Read node content, understand relationships
+  │    → Semantic layer — no CLI call, happens in the AI agent
+  │
+  └─ AI Agent now has full context to create/update proposals
+```
+
+The `--expand N` flag on `gm graph query` is critical — it lets the AI agent retrieve an anchor node **plus its neighborhood** in a single call, reducing round-trips.
+
+### Event Types for Tags
+
+| Event type | Payload |
+|---|---|
+| `tag_created` | Full tag snapshot |
+| `tag_updated` | Tag ID + changed fields |
+| `tag_deleted` | Tag ID + last snapshot |
+| `node_tagged` | Node ID + Tag ID |
+| `node_untagged` | Node ID + Tag ID |
 
 ---
 
@@ -293,10 +382,24 @@ type GraphService interface {
     ListEdges(ctx context.Context, filter model.EdgeFilter) ([]model.Edge, error)
     DeleteEdge(ctx context.Context, id string) error
 
+    // Tags on nodes
+    TagNode(ctx context.Context, nodeID string, tagID string) error
+    UntagNode(ctx context.Context, nodeID string, tagID string) error
+
     // Graph-level
     Query(ctx context.Context, input model.QueryInput) (model.QueryResult, error)
     Traverse(ctx context.Context, input model.TraverseInput) (model.TraverseResult, error)
     Stats(ctx context.Context) (model.GraphStats, error)
+}
+
+// TagService handles tag CRUD and search.
+type TagService interface {
+    Create(ctx context.Context, input model.CreateTagInput) (model.Tag, error)
+    Get(ctx context.Context, id string) (model.Tag, error)
+    List(ctx context.Context, filter model.TagFilter) ([]model.Tag, error)
+    Update(ctx context.Context, id string, input model.UpdateTagInput) (model.Tag, error)
+    Delete(ctx context.Context, id string) error
+    Search(ctx context.Context, keyword string) ([]model.Tag, error)
 }
 
 // ProposalService handles the proposal lifecycle.
