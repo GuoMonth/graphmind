@@ -154,6 +154,17 @@ Not pursuing in the current phase:
 
 ---
 
+## Documentation
+
+| Document | Scope |
+|---|---|
+| [Design](docs/design.md) | Why — design rationale, tag system, event sourcing, storage choice |
+| [Architecture](docs/architecture.md) | What — system layers, packages, data flow, validation |
+| [CLI Specification](docs/cli-spec.md) | API — command contract, type registries, I/O conventions |
+| [Conventions](docs/conventions.md) | Rules — naming, Go, database, engineering workflow |
+
+---
+
 ## Tech Stack
 
 | | |
