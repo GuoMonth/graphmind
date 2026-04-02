@@ -2,7 +2,7 @@
 
 **Graph-based project management, built natively for AI agents.**
 
-GraphMind is a local-first project management CLI designed for AI agents like [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex](https://openai.com/index/codex/), and [Copilot](https://github.com/features/copilot). Humans never touch GraphMind directly — they talk to an AI agent, and the AI agent uses GraphMind to read and write the graph.
+GraphMind is a local-first CLI that AI agents ([Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex](https://openai.com/index/codex/), [Copilot](https://github.com/features/copilot)) use to read and write a project graph stored in SQLite. Humans talk to the AI agent. The AI agent calls `gm`.
 
 > _"I just describe what's happening, and the system figures out what I need to do."_
 
@@ -10,108 +10,44 @@ GraphMind is a local-first project management CLI designed for AI agents like [C
 
 ## Why
 
-Traditional project management tools (Linear, Jira) simplify projects into forms, statuses, and boards so humans can operate them directly. Simplification for presentation is fine — **but the underlying storage should not throw away the real structure**.
+Traditional tools (Linear, Jira) flatten projects into forms, statuses, and boards. The simplification helps humans, but **the storage discards the real structure**.
 
-Real projects have **many node types** (tasks, decisions, risks, releases), **many relationship types** (depends-on, blocks, decomposes-into, caused-by), and they **evolve continuously** as understanding changes. At their core, they are **dynamically evolving graphs**.
-
-GraphMind preserves the full graph underneath. AI agents process the complexity and present it to humans in digestible form.
+Real projects are **dynamically evolving graphs** -- multiple node types (tasks, decisions, risks), multiple relationship types (depends-on, blocks, decomposes-into), continuously changing. GraphMind preserves the full graph. AI agents handle the complexity.
 
 ---
 
-## Architecture
+## How It Works
 
 ```
 Human
-  ↕  natural language conversation
+  |  natural language
 AI Agent (Claude Code / Codex / Copilot)
-  ↕  structured commands + JSON
+  |  structured JSON
 GraphMind CLI (gm)
-  ↕  read / write
+  |  read / write
 Graph (SQLite)
 ```
 
-| Layer | Responsibility |
-|---|---|
-| **Human** | Provide context, make decisions, confirm proposals |
-| **AI Agent** | Converse, ask follow-ups, extract structure, generate proposals, call CLI |
-| **GraphMind CLI** | Read/write interface to the graph — structured I/O, predictable behavior, machine-parseable |
-| **Graph** | Store the complete, real relationships of the project as a graph |
+1. Human describes what's happening
+2. AI agent asks follow-up questions
+3. AI agent queries the graph for context (`gm graph query`, `gm tag search`)
+4. AI agent creates a proposal with nodes, edges, and tags (`gm proposal create`)
+5. Human confirms, AI agent commits (`gm proposal commit`)
+6. Repeat as the project evolves
 
 ---
 
-## Workflow
+## Three-Layer Association Model
 
-A concrete example:
+AI agents discover relationships through three complementary layers:
 
-**① Human provides context**
+| Layer | Mechanism | Cost | Purpose |
+|---|---|---|---|
+| **Tags** | Shared named concepts | Low | Discovery entry point -- O(N) implicit clustering |
+| **Edges** | Typed directed relationships | High | Structural analysis -- depends-on, blocks, decomposes |
+| **AI Semantic** | Content reasoning at query time | Zero | Deep association on small subgraphs |
 
-```
-User: We've decided to extract the payment module from the monolith into
-      a microservice. Alice owns the API design, Bob owns the data migration.
-      Starting next week — blocked on the auth service API being stable first.
-```
-
-**② AI agent asks follow-up questions**
-
-```
-AI: What's the target version for the split? Is there a hard deadline?
-AI: "Blocked on auth API being stable" — what does stable mean here? Who decides?
-```
-
-**③ AI agent queries the graph via CLI**
-
-```bash
-$ gm query --related "auth API" --format json
-```
-
-```
-AI: The graph already has "Auth API refactor" (#42), in progress, owned by
-    Charlie. Is that the dependency you're referring to?
-```
-
-**④ AI agent generates a proposal via CLI**
-
-```bash
-$ gm proposal create --format json << 'EOF'
-{
-  "nodes": [
-    {"title": "Payment microservice extraction", "type": "epic"},
-    {"title": "Payment API design", "type": "task", "assignee": "Alice"},
-    {"title": "Payment data migration", "type": "task", "assignee": "Bob"}
-  ],
-  "edges": [
-    {"from": "Payment microservice extraction", "to": "Payment API design", "type": "decompose"},
-    {"from": "Payment microservice extraction", "to": "Payment data migration", "type": "decompose"},
-    {"from": "Payment data migration", "to": "#42", "type": "depends_on"}
-  ]
-}
-EOF
-```
-
-The AI agent presents the result in human-readable form:
-
-```
-AI: Here's what I'll create:
-    📦 Payment microservice extraction (epic)
-     ├── Payment API design (Alice)
-     └── Payment data migration (Bob) → depends on #42 Auth API refactor
-    Shall I commit this?
-```
-
-**⑤ Human confirms, commit**
-
-```bash
-$ gm proposal commit <proposal-id>
-```
-
-**⑥ Continuous evolution**
-
-```
-User: Alice says the API design is done, but we discovered we need
-      a new gateway layer — that wasn't planned for.
-```
-
-The AI agent calls the CLI again to update statuses, create new nodes, adjust relationships — generating a new proposal for confirmation. The cycle repeats.
+Tags are the search funnel entry point. AI agents extract 2-5 tags per node, creating implicit connections without O(N squared) explicit edges. See [Design](docs/design.md) for the full rationale.
 
 ---
 
@@ -119,38 +55,12 @@ The AI agent calls the CLI again to update statuses, create new nodes, adjust re
 
 | Principle | Meaning |
 |---|---|
-| **Graph-first** | Project data is stored as a graph. Never flattened into forms, lists, or boards at the storage layer |
-| **Proposal-first** | All changes are staged as proposals. Only committed after human confirmation. Prevents bad modeling from polluting the system |
-| **Event-sourced** | All mutations are recorded as events. Current state is derived by projection. Supports retrospection and evolution analysis |
-| **Evolving Graph** | The graph is never "done". Supports enrichment, correction, splitting, merging, and reclassification |
-| **CLI-as-Tool** | The CLI is a tool interface for AI agents, not a UI for humans. Structured I/O, predictable behavior |
-| **Local-first** | Runs locally by default (SQLite). Zero config. Single-user first |
-
----
-
-## Role of AI
-
-AI agents don't make decisions. They handle the graph complexity that humans can't manage visually:
-
-- **Extract** — pull structured nodes and relationships from natural language
-- **Link** — connect new information to existing graph nodes
-- **Validate** — check graph consistency (circular deps, missing links, etc.)
-- **Project** — transform complex graph relationships into human-readable views
-- **Compress** — summarize large-scale graph information
-
-> AI is a "complexity rectifier", not a "project manager".
-
----
-
-## Non-goals
-
-Not pursuing in the current phase:
-
-- Enterprise permission systems
-- Complex approval workflows
-- Web UI / frontend-heavy experience
-- Full replacement for Linear or Jira
-- General-purpose graph database
+| **Graph-first** | Store the real structure, never flatten at the storage layer |
+| **Proposal-first** | All writes staged as proposals, committed after human confirmation |
+| **Event-sourced** | All mutations recorded as events; current state is a projection |
+| **Tags as semantic bridge** | AI-extracted concepts link related nodes without explicit edges |
+| **CLI-as-Tool** | For AI agents, not humans. JSON I/O, semantic exit codes |
+| **Local-first** | SQLite, zero config, single-user first |
 
 ---
 
@@ -158,10 +68,10 @@ Not pursuing in the current phase:
 
 | Document | Scope |
 |---|---|
-| [Design](docs/design.md) | Why — design rationale, tag system, event sourcing, storage choice |
-| [Architecture](docs/architecture.md) | What — system layers, packages, data flow, validation |
-| [CLI Specification](docs/cli-spec.md) | API — command contract, type registries, I/O conventions |
-| [Conventions](docs/conventions.md) | Rules — naming, Go, database, engineering workflow |
+| [Design](docs/design.md) | Why -- core thesis, tag system, event sourcing, storage choice |
+| [Architecture](docs/architecture.md) | What -- system layers, packages, data flow |
+| [CLI Specification](docs/cli-spec.md) | API -- command contract, type registries |
+| [Conventions](docs/conventions.md) | Rules -- naming, Go, database, engineering workflow |
 
 ---
 
@@ -170,11 +80,10 @@ Not pursuing in the current phase:
 | | |
 |---|---|
 | Language | Go 1.26 |
-| Storage | SQLite (via `modernc.org/sqlite`, pure Go) |
+| Storage | SQLite (`modernc.org/sqlite`, pure Go) |
 | Primary Keys | UUID v7 |
 | Interface | CLI (JSON I/O) |
-| Linting | golangci-lint v2 |
-| Quality gates | Git hooks (pre-commit, pre-push) |
+| Quality | golangci-lint v2, git hooks |
 
 ---
 
