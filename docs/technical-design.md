@@ -1,5 +1,8 @@
 # Technical Design
 
+> For system-level architecture (layers, data flow, interfaces, lifecycle), see [Architecture](architecture.md).
+> This document covers storage decisions, data model schemas, and SQL-level patterns.
+
 ## Storage: SQLite + Adjacency List
 
 GraphMind uses a single SQLite database file to store the full project graph. No external database server is needed.
