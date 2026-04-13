@@ -32,16 +32,26 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Build
+      - name: Build and package
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
+          TAG: ${{ github.ref_name }}
         run: |
-          EXT=""
-          if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
-          OUTPUT="gm-${GOOS}-${GOARCH}${EXT}"
-          go build -ldflags="-s -w -X main.version=${{ github.ref_name }}" -o "${OUTPUT}" ./cmd/gm
-          echo "ARTIFACT=${OUTPUT}" >> "$GITHUB_ENV"
+          BIN="gm"
+          if [ "$GOOS" = "windows" ]; then BIN="gm.exe"; fi
+
+          go build -ldflags="-s -w -X main.version=${TAG}" -o "${BIN}" ./cmd/gm
+
+          if [ "$GOOS" = "windows" ]; then
+            ARCHIVE="gm-${TAG}-${GOOS}-${GOARCH}.zip"
+            zip "${ARCHIVE}" "${BIN}"
+          else
+            ARCHIVE="gm-${TAG}-${GOOS}-${GOARCH}.tar.gz"
+            tar czf "${ARCHIVE}" "${BIN}"
+          fi
+
+          echo "ARTIFACT=${ARCHIVE}" >> "$GITHUB_ENV"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -66,5 +76,6 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: ${{ github.ref_name }}
           generate_release_notes: true
           files: dist/*
