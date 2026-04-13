@@ -89,7 +89,10 @@ OUTPUT
 			entity := "node"
 			if _, err := svc.graph.GetNode(ctx, id); err != nil {
 				if _, err := svc.graph.GetEdge(ctx, id); err != nil {
-					return fmt.Errorf("%w: entity %s not found", model.ErrNotFound, id)
+					return model.WithHint(
+						fmt.Errorf("%w: entity %s not found", model.ErrNotFound, id),
+						"Use 'gm ls node' or 'gm ls edge' to find valid IDs, or 'gm grep <keyword>' to search.",
+					)
 				}
 				action = model.OpDeleteEdge
 				entity = "edge"

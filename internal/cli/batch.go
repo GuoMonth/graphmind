@@ -80,11 +80,17 @@ OUTPUT
 			Data    map[string]any `json:"data"` // JSON operation payload
 		}
 		if err := json.Unmarshal(input, &rawOps); err != nil {
-			return fmt.Errorf("%w: invalid JSON: %s", model.ErrInvalidInput, err)
+			return model.WithHint(
+				fmt.Errorf("%w: invalid JSON: %s", model.ErrInvalidInput, err),
+				`Expected JSON array: [{"command":"add","data":{"type":"task","title":"..."}}]. See 'gm batch --help' for format.`,
+			)
 		}
 
 		if len(rawOps) == 0 {
-			return fmt.Errorf("%w: empty operations array", model.ErrInvalidInput)
+			return model.WithHint(
+				fmt.Errorf("%w: empty operations array", model.ErrInvalidInput),
+				`Provide at least one operation: [{"command":"add","data":{...}}]. See 'gm batch --help'.`,
+			)
 		}
 
 		ops := make([]model.ProposalOperation, 0, len(rawOps))
@@ -177,8 +183,11 @@ func batchCommandToOp(command string, data map[string]any, index int) (model.Pro
 		}
 
 	default:
-		return model.ProposalOperation{}, fmt.Errorf(
-			"%w: unknown batch command %q at index %d", model.ErrInvalidInput, command, index,
+		return model.ProposalOperation{}, model.WithHint(
+			fmt.Errorf(
+				"%w: unknown batch command %q at index %d", model.ErrInvalidInput, command, index,
+			),
+			"Valid commands: add, ln, tag, mv, rm. See 'gm batch --help' for usage.",
 		)
 	}
 }

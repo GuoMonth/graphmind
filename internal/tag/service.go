@@ -84,7 +84,10 @@ func (s *Service) GetTag(ctx context.Context, id string) (*model.Tag, error) {
 		`SELECT id, name, description, created_at, updated_at FROM tags WHERE id = ?`, id,
 	).Scan(&t.ID, &t.Name, &t.Description, &createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("%w: tag", model.ErrNotFound)
+		return nil, model.WithHint(
+			fmt.Errorf("%w: tag", model.ErrNotFound),
+			"Use 'gm ls tag' to list existing tags.",
+		)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan tag: %w", err)
@@ -105,7 +108,10 @@ func (s *Service) getTagTx(ctx context.Context, tx *sql.Tx, id string) (*model.T
 		`SELECT id, name, description, created_at, updated_at FROM tags WHERE id = ?`, id,
 	).Scan(&t.ID, &t.Name, &t.Description, &createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("%w: tag", model.ErrNotFound)
+		return nil, model.WithHint(
+			fmt.Errorf("%w: tag", model.ErrNotFound),
+			"Use 'gm ls tag' to list existing tags.",
+		)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan tag: %w", err)
@@ -144,7 +150,10 @@ func (s *Service) TagNode(ctx context.Context, tx *sql.Tx, input NodeInput) (*mo
 		return nil, fmt.Errorf("check node exists: %w", err)
 	}
 	if nodeExists == 0 {
-		return nil, fmt.Errorf("%w: node does not exist", model.ErrNotFound)
+		return nil, model.WithHint(
+			fmt.Errorf("%w: node does not exist", model.ErrNotFound),
+			fmt.Sprintf("Node %q not found. Use 'gm ls node' to list nodes.", input.NodeID),
+		)
 	}
 
 	// Upsert tag: find or create

@@ -71,7 +71,10 @@ CYCLE DETECTION
 		toID := args[1]
 
 		if !model.IsValidEdgeType(lnEdgeType) {
-			return fmt.Errorf("%w: invalid edge type %q", model.ErrInvalidInput, lnEdgeType)
+			return model.WithHint(
+				fmt.Errorf("%w: invalid edge type %q", model.ErrInvalidInput, lnEdgeType),
+				fmt.Sprintf("Valid edge types: %v. Example: gm ln <from> <to> --type depends_on", model.AllEdgeTypes()),
+			)
 		}
 
 		op := model.ProposalOperation{

@@ -236,8 +236,12 @@ func outputError(err error) int {
 
 	if !quiet {
 		env := model.Envelope{
-			OK:    false,
-			Error: &model.ErrorBody{Code: code, Message: err.Error()},
+			OK: false,
+			Error: &model.ErrorBody{
+				Code:    code,
+				Message: err.Error(),
+				Hint:    model.GetHint(err),
+			},
 		}
 		writeJSON(env)
 	}

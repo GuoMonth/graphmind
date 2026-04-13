@@ -36,10 +36,16 @@ type CreateNodeInput struct {
 // CreateNode creates a new node within the given transaction.
 func (s *Service) CreateNode(ctx context.Context, tx *sql.Tx, input CreateNodeInput) (*model.Node, error) {
 	if !model.IsValidNodeType(input.Type) {
-		return nil, fmt.Errorf("%w: invalid node type %q", model.ErrInvalidInput, input.Type)
+		return nil, model.WithHint(
+			fmt.Errorf("%w: invalid node type %q", model.ErrInvalidInput, input.Type),
+			fmt.Sprintf("Valid node types: %v. Use --type <type> with 'gm add'.", model.AllNodeTypes()),
+		)
 	}
 	if input.Title == "" {
-		return nil, fmt.Errorf("%w: title is required", model.ErrInvalidInput)
+		return nil, model.WithHint(
+			fmt.Errorf("%w: title is required", model.ErrInvalidInput),
+			"Provide --title <text> or include \"title\" in JSON stdin.",
+		)
 	}
 
 	id, err := uuid.NewV7()
@@ -89,7 +95,10 @@ func (s *Service) scanNode(row *sql.Row) (*model.Node, error) {
 	var propsJSON, createdAt, updatedAt string
 	err := row.Scan(&n.ID, &n.Type, &n.Title, &n.Description, &n.Status, &propsJSON, &createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("%w: node", model.ErrNotFound)
+		return nil, model.WithHint(
+			fmt.Errorf("%w: node", model.ErrNotFound),
+			"Use 'gm ls node' to list existing nodes, or 'gm grep <keyword>' to search.",
+		)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan node: %w", err)
@@ -148,7 +157,10 @@ func (s *Service) UpdateNode(ctx context.Context, tx *sql.Tx, input *UpdateNodeI
 
 	if input.Type != "" {
 		if !model.IsValidNodeType(input.Type) {
-			return nil, fmt.Errorf("%w: invalid node type %q", model.ErrInvalidInput, input.Type)
+			return nil, model.WithHint(
+				fmt.Errorf("%w: invalid node type %q", model.ErrInvalidInput, input.Type),
+				fmt.Sprintf("Valid node types: %v.", model.AllNodeTypes()),
+			)
 		}
 		sets = append(sets, "type = ?")
 		args = append(args, input.Type)
@@ -175,7 +187,10 @@ func (s *Service) UpdateNode(ctx context.Context, tx *sql.Tx, input *UpdateNodeI
 	}
 
 	if len(sets) == 0 {
-		return nil, fmt.Errorf("%w: no fields to update", model.ErrInvalidInput)
+		return nil, model.WithHint(
+			fmt.Errorf("%w: no fields to update", model.ErrInvalidInput),
+			"Provide at least one of: --title, --description, --status, --type, or properties via stdin JSON.",
+		)
 	}
 
 	sets = append(sets, "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')")
@@ -196,7 +211,10 @@ func (s *Service) UpdateNode(ctx context.Context, tx *sql.Tx, input *UpdateNodeI
 // DeleteNode removes a node and its associated edges and tag associations.
 func (s *Service) DeleteNode(ctx context.Context, tx *sql.Tx, id string) error {
 	if id == "" {
-		return fmt.Errorf("%w: id is required", model.ErrInvalidInput)
+		return model.WithHint(
+			fmt.Errorf("%w: id is required", model.ErrInvalidInput),
+			"Provide the node UUID. Use 'gm ls node' to find node IDs.",
+		)
 	}
 
 	// Verify node exists
@@ -233,7 +251,10 @@ func (s *Service) DeleteNode(ctx context.Context, tx *sql.Tx, id string) error {
 // DeleteEdge removes an edge by ID.
 func (s *Service) DeleteEdge(ctx context.Context, tx *sql.Tx, id string) error {
 	if id == "" {
-		return fmt.Errorf("%w: id is required", model.ErrInvalidInput)
+		return model.WithHint(
+			fmt.Errorf("%w: id is required", model.ErrInvalidInput),
+			"Provide the edge UUID. Use 'gm ls edge' to find edge IDs.",
+		)
 	}
 
 	// Verify edge exists
@@ -262,7 +283,10 @@ type SearchNodesFilter struct {
 // SearchNodes performs FTS5 full-text search across nodes.
 func (s *Service) SearchNodes(ctx context.Context, f SearchNodesFilter) ([]model.Node, error) {
 	if f.Pattern == "" {
-		return nil, fmt.Errorf("%w: search pattern is required", model.ErrInvalidInput)
+		return nil, model.WithHint(
+			fmt.Errorf("%w: search pattern is required", model.ErrInvalidInput),
+			"Provide a search term. Example: gm grep \"project plan\"",
+		)
 	}
 
 	query := `SELECT n.id, n.type, n.title, n.description, n.status, n.properties, n.created_at, n.updated_at
@@ -415,7 +439,10 @@ func (s *Service) CreateEdge(ctx context.Context, tx *sql.Tx, input CreateEdgeIn
 		id.String(), input.Type, input.FromID, input.ToID, string(propsJSON),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", model.ErrConflict, err)
+		return nil, model.WithHint(
+			fmt.Errorf("%w: %v", model.ErrConflict, err),
+			"An edge with the same type between these nodes may already exist. Use 'gm ls edge' to check.",
+		)
 	}
 
 	if err := s.event.Append(ctx, tx, "edge", id.String(), model.ActionEdgeCreated, input); err != nil {
@@ -429,13 +456,22 @@ func (s *Service) validateEdgeInput(
 	ctx context.Context, tx *sql.Tx, input CreateEdgeInput,
 ) error {
 	if !model.IsValidEdgeType(input.Type) {
-		return fmt.Errorf("%w: invalid edge type %q", model.ErrInvalidInput, input.Type)
+		return model.WithHint(
+			fmt.Errorf("%w: invalid edge type %q", model.ErrInvalidInput, input.Type),
+			fmt.Sprintf("Valid edge types: %v. Use --type <type> with 'gm ln'.", model.AllEdgeTypes()),
+		)
 	}
 	if input.FromID == "" || input.ToID == "" {
-		return fmt.Errorf("%w: from_id and to_id are required", model.ErrInvalidInput)
+		return model.WithHint(
+			fmt.Errorf("%w: from_id and to_id are required", model.ErrInvalidInput),
+			"Usage: gm ln <from-id> <to-id> --type <edge-type>",
+		)
 	}
 	if input.FromID == input.ToID {
-		return fmt.Errorf("%w: self-referencing edge not allowed", model.ErrInvalidInput)
+		return model.WithHint(
+			fmt.Errorf("%w: self-referencing edge not allowed", model.ErrInvalidInput),
+			"The from_id and to_id must be different nodes.",
+		)
 	}
 
 	var exists int
@@ -445,7 +481,10 @@ func (s *Service) validateEdgeInput(
 		return fmt.Errorf("check from_id node: %w", err)
 	}
 	if exists == 0 {
-		return fmt.Errorf("%w: from_id node does not exist", model.ErrNotFound)
+		return model.WithHint(
+			fmt.Errorf("%w: from_id node does not exist", model.ErrNotFound),
+			fmt.Sprintf("Node %q not found. Use 'gm ls node' to find valid IDs.", input.FromID),
+		)
 	}
 	if err := tx.QueryRowContext(ctx,
 		"SELECT COUNT(*) FROM nodes WHERE id = ?", input.ToID,
@@ -453,7 +492,10 @@ func (s *Service) validateEdgeInput(
 		return fmt.Errorf("check to_id node: %w", err)
 	}
 	if exists == 0 {
-		return fmt.Errorf("%w: to_id node does not exist", model.ErrNotFound)
+		return model.WithHint(
+			fmt.Errorf("%w: to_id node does not exist", model.ErrNotFound),
+			fmt.Sprintf("Node %q not found. Use 'gm ls node' to find valid IDs.", input.ToID),
+		)
 	}
 
 	if model.IsDirectionalEdgeType(input.Type) {
@@ -480,7 +522,10 @@ func (s *Service) detectCycle(ctx context.Context, tx *sql.Tx, edgeType, fromID,
 		return fmt.Errorf("cycle detection query: %w", err)
 	}
 	if found > 0 {
-		return fmt.Errorf("%w: edge would create a cycle", model.ErrConflict)
+		return model.WithHint(
+			fmt.Errorf("%w: edge would create a cycle", model.ErrConflict),
+			"A path already exists from the target to the source. Reverse the direction, or use a non-directional type like 'related_to'.",
+		)
 	}
 	return nil
 }
@@ -503,7 +548,10 @@ func (s *Service) scanEdge(row *sql.Row) (*model.Edge, error) {
 	var propsJSON, createdAt, updatedAt string
 	err := row.Scan(&e.ID, &e.Type, &e.FromID, &e.ToID, &propsJSON, &createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("%w: edge", model.ErrNotFound)
+		return nil, model.WithHint(
+			fmt.Errorf("%w: edge", model.ErrNotFound),
+			"Use 'gm ls edge' to list existing edges.",
+		)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan edge: %w", err)

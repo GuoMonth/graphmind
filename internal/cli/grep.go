@@ -79,8 +79,10 @@ OUTPUT
 			After:   grepAfter,
 		})
 		if err != nil {
-			// FTS5 syntax errors show as generic DB errors; wrap as invalid input
-			return fmt.Errorf("%w: %s", model.ErrInvalidInput, err)
+			return model.WithHint(
+				fmt.Errorf("%w: %s", model.ErrInvalidInput, err),
+				"FTS5 query syntax: use double quotes for phrases, OR/AND/NOT for boolean. Example: gm grep '\"project plan\" OR task'",
+			)
 		}
 
 		output(nodes)

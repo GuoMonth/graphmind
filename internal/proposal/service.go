@@ -33,6 +33,13 @@ func (s *Service) Create(ctx context.Context, operations []model.ProposalOperati
 	if len(operations) == 0 {
 		return nil, fmt.Errorf("%w: proposal must have at least one operation", model.ErrInvalidInput)
 	}
+	const maxOperations = 1000
+	if len(operations) > maxOperations {
+		return nil, model.WithHint(
+			fmt.Errorf("%w: proposal has %d operations, max %d", model.ErrInvalidInput, len(operations), maxOperations),
+			"Split into multiple proposals with up to 1000 operations each, then commit them sequentially.",
+		)
+	}
 
 	id, err := uuid.NewV7()
 	if err != nil {
@@ -86,7 +93,10 @@ func (s *Service) Commit(ctx context.Context, proposalID string) (*model.Proposa
 		return nil, err
 	}
 	if p.Status != model.ProposalStatusPending {
-		return nil, fmt.Errorf("%w: proposal is %s, not pending", model.ErrInvalidState, p.Status)
+		return nil, model.WithHint(
+			fmt.Errorf("%w: proposal is %s, not pending", model.ErrInvalidState, p.Status),
+			"Only pending proposals can be committed. Create a new proposal with 'gm add/ln/tag/mv/rm/batch'.",
+		)
 	}
 
 	// Track created entity IDs for internal references
@@ -136,7 +146,10 @@ func (s *Service) Reject(ctx context.Context, proposalID string) (*model.Proposa
 		return nil, err
 	}
 	if p.Status != model.ProposalStatusPending {
-		return nil, fmt.Errorf("%w: proposal is %s, not pending", model.ErrInvalidState, p.Status)
+		return nil, model.WithHint(
+			fmt.Errorf("%w: proposal is %s, not pending", model.ErrInvalidState, p.Status),
+			"Only pending proposals can be rejected. This proposal has already been processed.",
+		)
 	}
 
 	now := time.Now().UTC().Format(model.TimeFormat)
@@ -355,7 +368,10 @@ func (s *Service) scanProposal(row *sql.Row) (*model.Proposal, error) {
 
 	err := row.Scan(&p.ID, &p.Status, &opsJSON, &createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("%w: proposal", model.ErrNotFound)
+		return nil, model.WithHint(
+			fmt.Errorf("%w: proposal", model.ErrNotFound),
+			"Use 'gm ls proposal' to list proposals, or check the ID from a previous 'gm add/ln/tag/mv/rm/batch' output.",
+		)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan proposal: %w", err)

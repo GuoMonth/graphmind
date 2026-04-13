@@ -111,6 +111,9 @@ Use this to inspect any entity after listing with "gm ls".`,
 			return err
 		}
 
-		return fmt.Errorf("%w: no entity with id %s", model.ErrNotFound, id)
+		return model.WithHint(
+			fmt.Errorf("%w: no entity with id %s", model.ErrNotFound, id),
+			"Use 'gm ls node', 'gm ls edge', 'gm ls tag', or 'gm ls proposal' to find valid IDs.",
+		)
 	},
 }
