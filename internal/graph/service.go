@@ -148,7 +148,11 @@ func (s *Service) ListNodes(ctx context.Context, f ListNodesFilter) ([]model.Nod
 	for rows.Next() {
 		var n model.Node
 		var propsJSON, createdAt, updatedAt string
-		if err := rows.Scan(&n.ID, &n.Type, &n.Title, &n.Description, &n.Status, &propsJSON, &createdAt, &updatedAt); err != nil {
+		err := rows.Scan(
+			&n.ID, &n.Type, &n.Title, &n.Description,
+			&n.Status, &propsJSON, &createdAt, &updatedAt,
+		)
+		if err != nil {
 			return nil, fmt.Errorf("scan node: %w", err)
 		}
 		if err := json.Unmarshal([]byte(propsJSON), &n.Properties); err != nil {
@@ -172,30 +176,8 @@ type CreateEdgeInput struct {
 
 // CreateEdge creates a new edge within the given transaction.
 func (s *Service) CreateEdge(ctx context.Context, tx *sql.Tx, input CreateEdgeInput) (*model.Edge, error) {
-	if !model.ValidEdgeTypes[input.Type] {
-		return nil, fmt.Errorf("%w: invalid edge type %q", model.ErrInvalidInput, input.Type)
-	}
-	if input.FromID == "" || input.ToID == "" {
-		return nil, fmt.Errorf("%w: from_id and to_id are required", model.ErrInvalidInput)
-	}
-	if input.FromID == input.ToID {
-		return nil, fmt.Errorf("%w: self-referencing edge not allowed", model.ErrInvalidInput)
-	}
-
-	// Verify both nodes exist
-	var exists int
-	if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM nodes WHERE id = ?", input.FromID).Scan(&exists); err != nil || exists == 0 {
-		return nil, fmt.Errorf("%w: from_id node does not exist", model.ErrNotFound)
-	}
-	if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM nodes WHERE id = ?", input.ToID).Scan(&exists); err != nil || exists == 0 {
-		return nil, fmt.Errorf("%w: to_id node does not exist", model.ErrNotFound)
-	}
-
-	// Cycle detection for directional edge types
-	if model.DirectionalEdgeTypes[input.Type] {
-		if err := s.detectCycle(ctx, tx, input.Type, input.FromID, input.ToID); err != nil {
-			return nil, err
-		}
+	if err := s.validateEdgeInput(ctx, tx, input); err != nil {
+		return nil, err
 	}
 
 	id, err := uuid.NewV7()
@@ -225,6 +207,39 @@ func (s *Service) CreateEdge(ctx context.Context, tx *sql.Tx, input CreateEdgeIn
 	}
 
 	return s.getEdgeTx(ctx, tx, id.String())
+}
+
+func (s *Service) validateEdgeInput(
+	ctx context.Context, tx *sql.Tx, input CreateEdgeInput,
+) error {
+	if !model.ValidEdgeTypes[input.Type] {
+		return fmt.Errorf("%w: invalid edge type %q", model.ErrInvalidInput, input.Type)
+	}
+	if input.FromID == "" || input.ToID == "" {
+		return fmt.Errorf("%w: from_id and to_id are required", model.ErrInvalidInput)
+	}
+	if input.FromID == input.ToID {
+		return fmt.Errorf("%w: self-referencing edge not allowed", model.ErrInvalidInput)
+	}
+
+	var exists int
+	err := tx.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM nodes WHERE id = ?", input.FromID,
+	).Scan(&exists)
+	if err != nil || exists == 0 {
+		return fmt.Errorf("%w: from_id node does not exist", model.ErrNotFound)
+	}
+	err = tx.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM nodes WHERE id = ?", input.ToID,
+	).Scan(&exists)
+	if err != nil || exists == 0 {
+		return fmt.Errorf("%w: to_id node does not exist", model.ErrNotFound)
+	}
+
+	if model.DirectionalEdgeTypes[input.Type] {
+		return s.detectCycle(ctx, tx, input.Type, input.FromID, input.ToID)
+	}
+	return nil
 }
 
 // detectCycle checks if adding an edge from->to would create a cycle using recursive CTE.

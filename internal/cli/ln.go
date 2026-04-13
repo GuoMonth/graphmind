@@ -49,5 +49,5 @@ var lnCmd = &cobra.Command{
 
 func init() {
 	lnCmd.Flags().StringVar(&lnEdgeType, "type", "", "Edge type (required)")
-	lnCmd.MarkFlagRequired("type")
+	_ = lnCmd.MarkFlagRequired("type")
 }

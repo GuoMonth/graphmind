@@ -107,15 +107,15 @@ func (s *Service) getTagTx(ctx context.Context, tx *sql.Tx, id string) (*model.T
 	return &t, nil
 }
 
-// TagNodeInput defines the input for tagging a node.
-type TagNodeInput struct {
+// NodeInput defines the input for tagging a node.
+type NodeInput struct {
 	NodeID      string `json:"node_id"`
 	TagName     string `json:"tag_name"`
 	Description string `json:"description"`
 }
 
 // TagNode associates a tag with a node. Creates the tag if it doesn't exist (upsert).
-func (s *Service) TagNode(ctx context.Context, tx *sql.Tx, input TagNodeInput) (*model.Tag, error) {
+func (s *Service) TagNode(ctx context.Context, tx *sql.Tx, input NodeInput) (*model.Tag, error) {
 	if input.NodeID == "" {
 		return nil, fmt.Errorf("%w: node_id is required", model.ErrInvalidInput)
 	}
@@ -125,7 +125,10 @@ func (s *Service) TagNode(ctx context.Context, tx *sql.Tx, input TagNodeInput) (
 
 	// Verify node exists
 	var nodeExists int
-	if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM nodes WHERE id = ?", input.NodeID).Scan(&nodeExists); err != nil || nodeExists == 0 {
+	err := tx.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM nodes WHERE id = ?", input.NodeID,
+	).Scan(&nodeExists)
+	if err != nil || nodeExists == 0 {
 		return nil, fmt.Errorf("%w: node does not exist", model.ErrNotFound)
 	}
 

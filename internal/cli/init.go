@@ -12,7 +12,7 @@ import (
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize graph database",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		database, err := db.Open(dbPath)
 		if err != nil {
 			os.Exit(outputError(fmt.Errorf("open database: %w", err)))

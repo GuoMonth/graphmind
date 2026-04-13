@@ -21,7 +21,7 @@ var addCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Create a node → proposal",
 	Long:  "Create a new node in the project graph. Returns a pending proposal.",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		if err := wireAndMigrate(); err != nil {
 			os.Exit(outputError(err))
 			return nil

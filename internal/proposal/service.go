@@ -58,9 +58,10 @@ func (s *Service) Create(ctx context.Context, operations []model.ProposalOperati
 		return nil, fmt.Errorf("insert proposal: %w", err)
 	}
 
-	if err := s.event.Append(ctx, tx, "proposal", id.String(), model.ActionProposalCreated, map[string]any{ // event payload requires any
-		"operation_count": len(operations),
-	}); err != nil {
+	if err := s.event.Append(ctx, tx, "proposal", id.String(),
+		model.ActionProposalCreated, map[string]any{ // event payload requires any
+			"operation_count": len(operations),
+		}); err != nil {
 		return nil, fmt.Errorf("append proposal_created event: %w", err)
 	}
 
@@ -158,7 +159,9 @@ func (s *Service) Reject(ctx context.Context, proposalID string) (*model.Proposa
 	return s.Get(ctx, proposalID)
 }
 
-func (s *Service) applyOperation(ctx context.Context, tx *sql.Tx, op model.ProposalOperation, createdIDs map[int]string) (string, error) {
+func (s *Service) applyOperation(
+	ctx context.Context, tx *sql.Tx, op model.ProposalOperation, createdIDs map[int]string,
+) (string, error) {
 	switch op.Action {
 	case model.OpCreateNode:
 		return s.applyCreateNode(ctx, tx, op.Data)
@@ -191,7 +194,9 @@ func (s *Service) applyCreateNode(ctx context.Context, tx *sql.Tx, data map[stri
 	return node.ID, nil
 }
 
-func (s *Service) applyCreateEdge(ctx context.Context, tx *sql.Tx, data map[string]any, createdIDs map[int]string) (string, error) {
+func (s *Service) applyCreateEdge(
+	ctx context.Context, tx *sql.Tx, data map[string]any, createdIDs map[int]string,
+) (string, error) {
 	input := graph.CreateEdgeInput{
 		Type:   getString(data, "type"),
 		FromID: getString(data, "from_id"),
@@ -227,8 +232,10 @@ func (s *Service) applyCreateEdge(ctx context.Context, tx *sql.Tx, data map[stri
 	return edge.ID, nil
 }
 
-func (s *Service) applyTagNode(ctx context.Context, tx *sql.Tx, data map[string]any, createdIDs map[int]string) (string, error) {
-	input := tag.TagNodeInput{
+func (s *Service) applyTagNode(
+	ctx context.Context, tx *sql.Tx, data map[string]any, createdIDs map[int]string,
+) (string, error) {
+	input := tag.NodeInput{
 		NodeID:      getString(data, "node_id"),
 		TagName:     getString(data, "tag_name"),
 		Description: getString(data, "description"),

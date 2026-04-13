@@ -2,9 +2,9 @@ package model
 
 // Envelope is the standard JSON output wrapper.
 type Envelope struct {
-	OK    bool        `json:"ok"`
-	Data  any         `json:"data,omitempty"`  // present on success
-	Error *ErrorBody  `json:"error,omitempty"` // present on failure
+	OK    bool       `json:"ok"`
+	Data  any        `json:"data,omitempty"`  // present on success
+	Error *ErrorBody `json:"error,omitempty"` // present on failure
 }
 
 // ErrorBody is the structured error in the envelope.
@@ -42,16 +42,16 @@ const (
 
 // Event actions
 const (
-	ActionNodeCreated    = "node_created"
-	ActionNodeUpdated    = "node_updated"
-	ActionNodeDeleted    = "node_deleted"
-	ActionEdgeCreated    = "edge_created"
-	ActionEdgeDeleted    = "edge_deleted"
-	ActionTagCreated     = "tag_created"
-	ActionTagUpdated     = "tag_updated"
-	ActionTagDeleted     = "tag_deleted"
-	ActionNodeTagged     = "node_tagged"
-	ActionNodeUntagged   = "node_untagged"
+	ActionNodeCreated       = "node_created"
+	ActionNodeUpdated       = "node_updated"
+	ActionNodeDeleted       = "node_deleted"
+	ActionEdgeCreated       = "edge_created"
+	ActionEdgeDeleted       = "edge_deleted"
+	ActionTagCreated        = "tag_created"
+	ActionTagUpdated        = "tag_updated"
+	ActionTagDeleted        = "tag_deleted"
+	ActionNodeTagged        = "node_tagged"
+	ActionNodeUntagged      = "node_untagged"
 	ActionProposalCreated   = "proposal_created"
 	ActionProposalCommitted = "proposal_committed"
 	ActionProposalRejected  = "proposal_rejected"
@@ -86,9 +86,9 @@ var ValidEdgeTypes = map[string]bool{
 
 // DirectionalEdgeTypes are edge types that should be checked for cycles.
 var DirectionalEdgeTypes = map[string]bool{
-	EdgeTypeDependsOn: true,
-	EdgeTypeBlocks:    true,
-	EdgeTypeDecompose: true,
-	EdgeTypeCausedBy:  true,
+	EdgeTypeDependsOn:  true,
+	EdgeTypeBlocks:     true,
+	EdgeTypeDecompose:  true,
+	EdgeTypeCausedBy:   true,
 	EdgeTypeSupersedes: true,
 }
