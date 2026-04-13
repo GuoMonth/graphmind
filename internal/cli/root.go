@@ -84,7 +84,7 @@ ENTITY TYPES
   Tag:         any string name (auto-created on first use)
 
   Directional edges (all except related_to) are checked for same-type
-  cycles when created. related_to is bidirectional and skip cycle checks.
+  cycles when created. related_to is a symmetric association (no cycle check).
 
 COMMANDS
 
@@ -122,9 +122,13 @@ TYPICAL WORKFLOW
   $ gm cat <node-id>
   # → {"ok":true,"data":{"id":"019...","type":"task","title":"Build auth module",...}}
 
+  To discard instead of applying:
+  $ gm reject 019...
+  # → {"ok":true,"data":{"id":"019...","status":"rejected",...}}
+
 STDIN PIPELINE
 
-  Write commands (add) accept JSON from stdin instead of flags:
+  The add command accepts JSON from stdin instead of flags:
 
   $ echo '{"type":"task","title":"Fix bug #42"}' | gm add
 

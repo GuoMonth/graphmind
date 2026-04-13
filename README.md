@@ -29,7 +29,7 @@ gm commit <proposal-id>
 # List entities
 gm ls node                         # all nodes
 gm ls node --type task             # only tasks
-gm ls edge --from-id <id>          # outgoing edges
+gm ls edge --type depends_on         # edges by type
 gm ls tag                          # all tags
 
 # Show full detail of any entity
@@ -45,7 +45,7 @@ All commands output JSON envelopes (`{"ok": true, "data": ...}`), making them co
 | Command | Description |
 |---------|-------------|
 | `gm init` | Initialize project database |
-| `gm add` | Create a node (task, epic, story, bug, note, decision, risk) |
+| `gm add` | Create a node (task, epic, decision, risk, release, discussion) |
 | `gm ln` | Create a directed edge between two nodes |
 | `gm tag` | Associate a tag with a node (upsert) |
 | `gm commit` | Apply a pending proposal atomically |
@@ -138,7 +138,7 @@ Tags are the search funnel entry point. AI agents extract 2–5 tags per node, c
 
 | | |
 |---|---|
-| Language | Go 1.26 |
+| Language | Go 1.25 |
 | Storage | SQLite (`modernc.org/sqlite`, pure Go, no CGO) |
 | Primary Keys | UUID v7 (time-ordered, RFC 9562) |
 | Interface | CLI with JSON envelope protocol |

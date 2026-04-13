@@ -45,7 +45,7 @@ is committed. If it already exists, the existing tag is reused.`,
   #   }
   # }
 
-  # Error — node not found (on commit):
+  # Error — node not found (surfaces when proposal is committed, not at tag time):
   # {"ok":false,"error":{"code":"NOT_FOUND","message":"not found: node does not exist"}}`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {

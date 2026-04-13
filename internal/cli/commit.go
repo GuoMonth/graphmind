@@ -35,10 +35,11 @@ Only proposals with status "pending" can be committed.`,
   # }
 
   # Error — already committed:
-  # {"ok":false,"error":{"code":"CONFLICT","message":"invalid state: proposal is not pending"}}
+  # {"ok":false,"error":{"code":"CONFLICT",
+  #   "message":"invalid state: proposal is committed, not pending"}}
 
   # Error — proposal not found:
-  # {"ok":false,"error":{"code":"NOT_FOUND","message":"not found: proposal does not exist"}}`,
+  # {"ok":false,"error":{"code":"NOT_FOUND","message":"not found: proposal"}}`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := wireAndMigrate(cmd.Context()); err != nil {
@@ -78,7 +79,8 @@ Only proposals with status "pending" can be rejected.`,
   # }
 
   # Error — already committed/rejected:
-  # {"ok":false,"error":{"code":"CONFLICT","message":"invalid state: proposal is not pending"}}`,
+  # {"ok":false,"error":{"code":"CONFLICT",
+  #   "message":"invalid state: proposal is committed, not pending"}}`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := wireAndMigrate(cmd.Context()); err != nil {
