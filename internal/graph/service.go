@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/senguoyun-guosheng/graphmind/internal/event"
@@ -98,8 +97,12 @@ func (s *Service) scanNode(row *sql.Row) (*model.Node, error) {
 	if err := json.Unmarshal([]byte(propsJSON), &n.Properties); err != nil {
 		return nil, fmt.Errorf("unmarshal node properties: %w", err)
 	}
-	n.CreatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", createdAt)
-	n.UpdatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", updatedAt)
+	if n.CreatedAt, err = model.ParseTime(createdAt); err != nil {
+		return nil, err
+	}
+	if n.UpdatedAt, err = model.ParseTime(updatedAt); err != nil {
+		return nil, err
+	}
 
 	return &n, nil
 }
@@ -145,7 +148,7 @@ func (s *Service) ListNodes(ctx context.Context, f ListNodesFilter) ([]model.Nod
 	}
 	defer rows.Close()
 
-	var nodes []model.Node
+	nodes := []model.Node{}
 	for rows.Next() {
 		var n model.Node
 		var propsJSON, createdAt, updatedAt string
@@ -159,8 +162,12 @@ func (s *Service) ListNodes(ctx context.Context, f ListNodesFilter) ([]model.Nod
 		if err := json.Unmarshal([]byte(propsJSON), &n.Properties); err != nil {
 			return nil, fmt.Errorf("unmarshal node properties: %w", err)
 		}
-		n.CreatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", createdAt)
-		n.UpdatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", updatedAt)
+		if n.CreatedAt, err = model.ParseTime(createdAt); err != nil {
+			return nil, err
+		}
+		if n.UpdatedAt, err = model.ParseTime(updatedAt); err != nil {
+			return nil, err
+		}
 		nodes = append(nodes, n)
 	}
 
@@ -200,7 +207,7 @@ func (s *Service) CreateEdge(ctx context.Context, tx *sql.Tx, input CreateEdgeIn
 		id.String(), input.Type, input.FromID, input.ToID, string(propsJSON),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("%w: duplicate edge or constraint violation", model.ErrConflict)
+		return nil, fmt.Errorf("%w: %v", model.ErrConflict, err)
 	}
 
 	if err := s.event.Append(ctx, tx, "edge", id.String(), model.ActionEdgeCreated, input); err != nil {
@@ -224,16 +231,20 @@ func (s *Service) validateEdgeInput(
 	}
 
 	var exists int
-	err := tx.QueryRowContext(ctx,
+	if err := tx.QueryRowContext(ctx,
 		"SELECT COUNT(*) FROM nodes WHERE id = ?", input.FromID,
-	).Scan(&exists)
-	if err != nil || exists == 0 {
+	).Scan(&exists); err != nil {
+		return fmt.Errorf("check from_id node: %w", err)
+	}
+	if exists == 0 {
 		return fmt.Errorf("%w: from_id node does not exist", model.ErrNotFound)
 	}
-	err = tx.QueryRowContext(ctx,
+	if err := tx.QueryRowContext(ctx,
 		"SELECT COUNT(*) FROM nodes WHERE id = ?", input.ToID,
-	).Scan(&exists)
-	if err != nil || exists == 0 {
+	).Scan(&exists); err != nil {
+		return fmt.Errorf("check to_id node: %w", err)
+	}
+	if exists == 0 {
 		return fmt.Errorf("%w: to_id node does not exist", model.ErrNotFound)
 	}
 
@@ -293,8 +304,12 @@ func (s *Service) scanEdge(row *sql.Row) (*model.Edge, error) {
 	if err := json.Unmarshal([]byte(propsJSON), &e.Properties); err != nil {
 		return nil, fmt.Errorf("unmarshal edge properties: %w", err)
 	}
-	e.CreatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", createdAt)
-	e.UpdatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", updatedAt)
+	if e.CreatedAt, err = model.ParseTime(createdAt); err != nil {
+		return nil, err
+	}
+	if e.UpdatedAt, err = model.ParseTime(updatedAt); err != nil {
+		return nil, err
+	}
 
 	return &e, nil
 }
@@ -345,7 +360,7 @@ func (s *Service) ListEdges(ctx context.Context, f ListEdgesFilter) ([]model.Edg
 	}
 	defer rows.Close()
 
-	var edges []model.Edge
+	edges := []model.Edge{}
 	for rows.Next() {
 		var e model.Edge
 		var propsJSON, createdAt, updatedAt string
@@ -355,20 +370,14 @@ func (s *Service) ListEdges(ctx context.Context, f ListEdgesFilter) ([]model.Edg
 		if err := json.Unmarshal([]byte(propsJSON), &e.Properties); err != nil {
 			return nil, fmt.Errorf("unmarshal edge properties: %w", err)
 		}
-		e.CreatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", createdAt)
-		e.UpdatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", updatedAt)
+		if e.CreatedAt, err = model.ParseTime(createdAt); err != nil {
+			return nil, err
+		}
+		if e.UpdatedAt, err = model.ParseTime(updatedAt); err != nil {
+			return nil, err
+		}
 		edges = append(edges, e)
 	}
 
 	return edges, rows.Err()
-}
-
-// NodeExists checks whether a node with the given ID exists.
-func (s *Service) NodeExists(ctx context.Context, tx *sql.Tx, id string) (bool, error) {
-	var count int
-	err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM nodes WHERE id = ?", id).Scan(&count)
-	if err != nil {
-		return false, fmt.Errorf("check node existence: %w", err)
-	}
-	return count > 0, nil
 }

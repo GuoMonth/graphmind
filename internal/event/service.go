@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/senguoyun-guosheng/graphmind/internal/model"
@@ -90,14 +89,16 @@ func (s *Service) List(ctx context.Context, f ListFilter) ([]model.Event, error)
 	}
 	defer rows.Close()
 
-	var events []model.Event
+	events := []model.Event{}
 	for rows.Next() {
 		var e model.Event
 		var createdAt string
 		if err := rows.Scan(&e.ID, &e.EntityType, &e.EntityID, &e.Action, &e.Payload, &createdAt); err != nil {
 			return nil, fmt.Errorf("scan event: %w", err)
 		}
-		e.CreatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", createdAt)
+		if e.CreatedAt, err = model.ParseTime(createdAt); err != nil {
+			return nil, err
+		}
 		events = append(events, e)
 	}
 

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -87,11 +88,11 @@ func wireServices() error {
 }
 
 // wireAndMigrate opens DB, runs migrations, then wires services.
-func wireAndMigrate() error {
+func wireAndMigrate(ctx context.Context) error {
 	if err := wireServices(); err != nil {
 		return err
 	}
-	return db.Migrate(rootCmd.Context(), svc.db)
+	return db.Migrate(ctx, svc.db)
 }
 
 // output writes the JSON envelope to stdout.

@@ -176,8 +176,8 @@ func TestListNodesEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListNodes: %v", err)
 	}
-	if nodes != nil {
-		t.Errorf("expected nil for empty list, got %d nodes", len(nodes))
+	if len(nodes) != 0 {
+		t.Errorf("expected empty list, got %d nodes", len(nodes))
 	}
 }
 
@@ -629,29 +629,5 @@ func TestGetEdgeNotFound(t *testing.T) {
 	_, err := env.graph.GetEdge(env.ctx, "nonexistent")
 	if !errors.Is(err, model.ErrNotFound) {
 		t.Errorf("err = %v, want ErrNotFound", err)
-	}
-}
-
-func TestNodeExists(t *testing.T) {
-	env := setup(t)
-	a := env.createNode(t, "task", "A")
-
-	tx := env.beginTx(t)
-	defer tx.Rollback()
-
-	exists, err := env.graph.NodeExists(env.ctx, tx, a.ID)
-	if err != nil {
-		t.Fatalf("NodeExists: %v", err)
-	}
-	if !exists {
-		t.Error("NodeExists returned false for existing node")
-	}
-
-	exists, err = env.graph.NodeExists(env.ctx, tx, "nonexistent")
-	if err != nil {
-		t.Fatalf("NodeExists: %v", err)
-	}
-	if exists {
-		t.Error("NodeExists returned true for nonexistent node")
 	}
 }

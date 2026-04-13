@@ -102,7 +102,7 @@ func (s *Service) Commit(ctx context.Context, proposalID string) (*model.Proposa
 		}
 	}
 
-	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	now := time.Now().UTC().Format(model.TimeFormat)
 	_, err = tx.ExecContext(ctx,
 		`UPDATE proposals SET status = ?, updated_at = ? WHERE id = ?`,
 		model.ProposalStatusCommitted, now, proposalID,
@@ -139,7 +139,7 @@ func (s *Service) Reject(ctx context.Context, proposalID string) (*model.Proposa
 	}
 	defer tx.Rollback()
 
-	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	now := time.Now().UTC().Format(model.TimeFormat)
 	_, err = tx.ExecContext(ctx,
 		`UPDATE proposals SET status = ?, updated_at = ? WHERE id = ?`,
 		model.ProposalStatusRejected, now, proposalID,
@@ -275,8 +275,12 @@ func (s *Service) Get(ctx context.Context, id string) (*model.Proposal, error) {
 	if err := json.Unmarshal([]byte(opsJSON), &p.Operations); err != nil {
 		return nil, fmt.Errorf("unmarshal operations: %w", err)
 	}
-	p.CreatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", createdAt)
-	p.UpdatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", updatedAt)
+	if p.CreatedAt, err = model.ParseTime(createdAt); err != nil {
+		return nil, err
+	}
+	if p.UpdatedAt, err = model.ParseTime(updatedAt); err != nil {
+		return nil, err
+	}
 
 	return &p, nil
 }
@@ -317,7 +321,7 @@ func (s *Service) List(ctx context.Context, f ListFilter) ([]model.Proposal, err
 	}
 	defer rows.Close()
 
-	var proposals []model.Proposal
+	proposals := []model.Proposal{}
 	for rows.Next() {
 		var p model.Proposal
 		var opsJSON, createdAt, updatedAt string
@@ -327,8 +331,12 @@ func (s *Service) List(ctx context.Context, f ListFilter) ([]model.Proposal, err
 		if err := json.Unmarshal([]byte(opsJSON), &p.Operations); err != nil {
 			return nil, fmt.Errorf("unmarshal operations: %w", err)
 		}
-		p.CreatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", createdAt)
-		p.UpdatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", updatedAt)
+		if p.CreatedAt, err = model.ParseTime(createdAt); err != nil {
+			return nil, err
+		}
+		if p.UpdatedAt, err = model.ParseTime(updatedAt); err != nil {
+			return nil, err
+		}
 		proposals = append(proposals, p)
 	}
 

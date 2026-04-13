@@ -10,7 +10,7 @@ var commitCmd = &cobra.Command{
 	Long:  "Apply all operations in a pending proposal atomically.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := wireAndMigrate(); err != nil {
+		if err := wireAndMigrate(cmd.Context()); err != nil {
 			return err
 		}
 
@@ -30,7 +30,7 @@ var rejectCmd = &cobra.Command{
 	Long:  "Discard all operations in a pending proposal.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := wireAndMigrate(); err != nil {
+		if err := wireAndMigrate(cmd.Context()); err != nil {
 			return err
 		}
 

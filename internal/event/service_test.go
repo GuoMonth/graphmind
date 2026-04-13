@@ -108,7 +108,9 @@ func TestListEmpty(t *testing.T) {
 		t.Fatalf("List: %v", err)
 	}
 	if events != nil {
-		t.Errorf("empty list should return nil, got %v", events)
+		if len(events) != 0 {
+			t.Errorf("empty list should return empty slice, got %d events", len(events))
+		}
 	}
 }
 

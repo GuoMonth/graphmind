@@ -15,7 +15,7 @@ var tagCmd = &cobra.Command{
 	Long:  "Associate a tag with a node. Creates the tag if it doesn't exist (upsert). Returns a pending proposal.",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := wireAndMigrate(); err != nil {
+		if err := wireAndMigrate(cmd.Context()); err != nil {
 			return err
 		}
 

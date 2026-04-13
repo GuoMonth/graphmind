@@ -22,7 +22,7 @@ var lsCmd = &cobra.Command{
 	Short: "List entities with filters",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := wireAndMigrate(); err != nil {
+		if err := wireAndMigrate(cmd.Context()); err != nil {
 			return err
 		}
 

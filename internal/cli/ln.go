@@ -15,7 +15,7 @@ var lnCmd = &cobra.Command{
 	Long:  "Create a directed edge between two nodes. Returns a pending proposal.",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := wireAndMigrate(); err != nil {
+		if err := wireAndMigrate(cmd.Context()); err != nil {
 			return err
 		}
 

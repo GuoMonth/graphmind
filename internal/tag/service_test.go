@@ -335,8 +335,8 @@ func TestListTagsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListTags: %v", err)
 	}
-	if tags != nil {
-		t.Errorf("expected nil for empty list, got %d tags", len(tags))
+	if len(tags) != 0 {
+		t.Errorf("expected empty list, got %d tags", len(tags))
 	}
 }
 

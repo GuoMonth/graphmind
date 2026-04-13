@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/senguoyun-guosheng/graphmind/internal/event"
@@ -45,7 +44,7 @@ func (s *Service) CreateTag(ctx context.Context, tx *sql.Tx, input CreateTagInpu
 		id.String(), input.Name, input.Description,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("%w: tag name %q already exists", model.ErrConflict, input.Name)
+		return nil, fmt.Errorf("%w: %v", model.ErrConflict, err)
 	}
 
 	if err := s.event.Append(ctx, tx, "tag", id.String(), model.ActionTagCreated, input); err != nil {
@@ -68,8 +67,12 @@ func (s *Service) GetTagByName(ctx context.Context, tx *sql.Tx, name string) (*m
 	if err != nil {
 		return nil, fmt.Errorf("scan tag: %w", err)
 	}
-	t.CreatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", createdAt)
-	t.UpdatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", updatedAt)
+	if t.CreatedAt, err = model.ParseTime(createdAt); err != nil {
+		return nil, err
+	}
+	if t.UpdatedAt, err = model.ParseTime(updatedAt); err != nil {
+		return nil, err
+	}
 	return &t, nil
 }
 
@@ -86,8 +89,12 @@ func (s *Service) GetTag(ctx context.Context, id string) (*model.Tag, error) {
 	if err != nil {
 		return nil, fmt.Errorf("scan tag: %w", err)
 	}
-	t.CreatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", createdAt)
-	t.UpdatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", updatedAt)
+	if t.CreatedAt, err = model.ParseTime(createdAt); err != nil {
+		return nil, err
+	}
+	if t.UpdatedAt, err = model.ParseTime(updatedAt); err != nil {
+		return nil, err
+	}
 	return &t, nil
 }
 
@@ -103,8 +110,12 @@ func (s *Service) getTagTx(ctx context.Context, tx *sql.Tx, id string) (*model.T
 	if err != nil {
 		return nil, fmt.Errorf("scan tag: %w", err)
 	}
-	t.CreatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", createdAt)
-	t.UpdatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", updatedAt)
+	if t.CreatedAt, err = model.ParseTime(createdAt); err != nil {
+		return nil, err
+	}
+	if t.UpdatedAt, err = model.ParseTime(updatedAt); err != nil {
+		return nil, err
+	}
 	return &t, nil
 }
 
@@ -178,7 +189,7 @@ func (s *Service) ListTags(ctx context.Context, f ListTagsFilter) ([]model.Tag, 
 	var args []any // sql scanning requires any
 
 	if f.After != "" {
-		query += " AND id > ?"
+		query += " AND name > ?"
 		args = append(args, f.After)
 	}
 
@@ -197,15 +208,19 @@ func (s *Service) ListTags(ctx context.Context, f ListTagsFilter) ([]model.Tag, 
 	}
 	defer rows.Close()
 
-	var tags []model.Tag
+	tags := []model.Tag{}
 	for rows.Next() {
 		var t model.Tag
 		var createdAt, updatedAt string
 		if err := rows.Scan(&t.ID, &t.Name, &t.Description, &createdAt, &updatedAt); err != nil {
 			return nil, fmt.Errorf("scan tag: %w", err)
 		}
-		t.CreatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", createdAt)
-		t.UpdatedAt, _ = time.Parse("2006-01-02T15:04:05.000Z", updatedAt)
+		if t.CreatedAt, err = model.ParseTime(createdAt); err != nil {
+			return nil, err
+		}
+		if t.UpdatedAt, err = model.ParseTime(updatedAt); err != nil {
+			return nil, err
+		}
 		tags = append(tags, t)
 	}
 
