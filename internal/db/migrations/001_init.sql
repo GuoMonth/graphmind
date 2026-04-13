@@ -95,7 +95,7 @@ END;
 
 CREATE TRIGGER nodes_fts_update AFTER UPDATE ON nodes BEGIN
     INSERT INTO nodes_fts (nodes_fts, rowid, title, description) VALUES ('delete', old.rowid, old.title, old.description);
-    INSERT INTO nodes_fts (nodes_fts, rowid, title, description) VALUES (new.rowid, new.title, new.description);
+    INSERT INTO nodes_fts (rowid, title, description) VALUES (new.rowid, new.title, new.description);
 END;
 
 CREATE VIRTUAL TABLE tags_fts USING fts5 (
@@ -114,5 +114,5 @@ END;
 
 CREATE TRIGGER tags_fts_update AFTER UPDATE ON tags BEGIN
     INSERT INTO tags_fts (tags_fts, rowid, name, description) VALUES ('delete', old.rowid, old.name, old.description);
-    INSERT INTO tags_fts (tags_fts, rowid, name, description) VALUES (new.rowid, new.name, new.description);
+    INSERT INTO tags_fts (rowid, name, description) VALUES (new.rowid, new.name, new.description);
 END;

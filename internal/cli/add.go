@@ -23,10 +23,8 @@ var addCmd = &cobra.Command{
 	Long:  "Create a new node in the project graph. Returns a pending proposal.",
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		if err := wireAndMigrate(); err != nil {
-			os.Exit(outputError(err))
-			return nil
+			return err
 		}
-		defer svc.db.Close()
 
 		data := map[string]any{ // proposal operation data uses any
 			"type":        addType,
@@ -40,14 +38,12 @@ var addCmd = &cobra.Command{
 		if (stat.Mode() & os.ModeCharDevice) == 0 {
 			input, err := io.ReadAll(os.Stdin)
 			if err != nil {
-				os.Exit(outputError(fmt.Errorf("%w: read stdin: %s", model.ErrInvalidInput, err)))
-				return nil
+				return fmt.Errorf("%w: read stdin: %s", model.ErrInvalidInput, err)
 			}
 			if len(input) > 0 {
 				var stdinData map[string]any // JSON input is untyped
 				if err := json.Unmarshal(input, &stdinData); err != nil {
-					os.Exit(outputError(fmt.Errorf("%w: invalid JSON: %s", model.ErrInvalidInput, err)))
-					return nil
+					return fmt.Errorf("%w: invalid JSON: %s", model.ErrInvalidInput, err)
 				}
 				data = stdinData
 			}
@@ -64,8 +60,7 @@ var addCmd = &cobra.Command{
 
 		p, err := svc.proposal.Create(cmd.Context(), []model.ProposalOperation{op})
 		if err != nil {
-			os.Exit(outputError(err))
-			return nil
+			return err
 		}
 
 		output(p)
@@ -74,8 +69,8 @@ var addCmd = &cobra.Command{
 }
 
 func init() {
-	addCmd.Flags().StringVar(&addType, "type", "", "Node type (required)")
-	addCmd.Flags().StringVar(&addTitle, "title", "", "Node title (required)")
+	addCmd.Flags().StringVar(&addType, "type", "", "Node type (required unless piped via stdin)")
+	addCmd.Flags().StringVar(&addTitle, "title", "", "Node title (required unless piped via stdin)")
 	addCmd.Flags().StringVar(&addDescription, "description", "", "Node description")
 	addCmd.Flags().StringVar(&addStatus, "status", "", "Initial status")
 }

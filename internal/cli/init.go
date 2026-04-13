@@ -1,9 +1,7 @@
 package cli
 
 import (
-	"context"
 	"fmt"
-	"os"
 
 	"github.com/senguoyun-guosheng/graphmind/internal/db"
 	"github.com/spf13/cobra"
@@ -12,17 +10,15 @@ import (
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize graph database",
-	RunE: func(_ *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		database, err := db.Open(dbPath)
 		if err != nil {
-			os.Exit(outputError(fmt.Errorf("open database: %w", err)))
-			return nil
+			return fmt.Errorf("open database: %w", err)
 		}
 		defer database.Close()
 
-		if err := db.Migrate(context.Background(), database); err != nil {
-			os.Exit(outputError(fmt.Errorf("run migrations: %w", err)))
-			return nil
+		if err := db.Migrate(cmd.Context(), database); err != nil {
+			return fmt.Errorf("run migrations: %w", err)
 		}
 
 		output(map[string]string{

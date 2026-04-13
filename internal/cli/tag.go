@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/senguoyun-guosheng/graphmind/internal/model"
 	"github.com/spf13/cobra"
@@ -17,10 +16,8 @@ var tagCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := wireAndMigrate(); err != nil {
-			os.Exit(outputError(err))
-			return nil
+			return err
 		}
-		defer svc.db.Close()
 
 		nodeID := args[0]
 		tagName := args[1]
@@ -33,13 +30,12 @@ var tagCmd = &cobra.Command{
 				"tag_name":    tagName,
 				"description": tagDescription,
 			},
-			Summary: fmt.Sprintf("tag %s with %q", nodeID[:8], tagName),
+			Summary: fmt.Sprintf("tag %s with %q", truncate(nodeID, 8), tagName),
 		}
 
 		p, err := svc.proposal.Create(cmd.Context(), []model.ProposalOperation{op})
 		if err != nil {
-			os.Exit(outputError(err))
-			return nil
+			return err
 		}
 
 		output(p)

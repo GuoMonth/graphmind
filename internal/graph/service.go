@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -87,7 +88,7 @@ func (s *Service) scanNode(row *sql.Row) (*model.Node, error) {
 	var n model.Node
 	var propsJSON, createdAt, updatedAt string
 	err := row.Scan(&n.ID, &n.Type, &n.Title, &n.Description, &n.Status, &propsJSON, &createdAt, &updatedAt)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("%w: node", model.ErrNotFound)
 	}
 	if err != nil {
@@ -125,7 +126,7 @@ func (s *Service) ListNodes(ctx context.Context, f ListNodesFilter) ([]model.Nod
 		args = append(args, f.Status)
 	}
 	if f.After != "" {
-		query += " AND id > ?"
+		query += " AND id < ?"
 		args = append(args, f.After)
 	}
 
@@ -282,7 +283,7 @@ func (s *Service) scanEdge(row *sql.Row) (*model.Edge, error) {
 	var e model.Edge
 	var propsJSON, createdAt, updatedAt string
 	err := row.Scan(&e.ID, &e.Type, &e.FromID, &e.ToID, &propsJSON, &createdAt, &updatedAt)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("%w: edge", model.ErrNotFound)
 	}
 	if err != nil {
@@ -325,7 +326,7 @@ func (s *Service) ListEdges(ctx context.Context, f ListEdgesFilter) ([]model.Edg
 		args = append(args, f.ToID)
 	}
 	if f.After != "" {
-		query += " AND id > ?"
+		query += " AND id < ?"
 		args = append(args, f.After)
 	}
 

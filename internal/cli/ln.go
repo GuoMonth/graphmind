@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/senguoyun-guosheng/graphmind/internal/model"
 	"github.com/spf13/cobra"
@@ -17,10 +16,8 @@ var lnCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := wireAndMigrate(); err != nil {
-			os.Exit(outputError(err))
-			return nil
+			return err
 		}
-		defer svc.db.Close()
 
 		fromID := args[0]
 		toID := args[1]
@@ -33,13 +30,12 @@ var lnCmd = &cobra.Command{
 				"from_id": fromID,
 				"to_id":   toID,
 			},
-			Summary: fmt.Sprintf("%s: %s → %s", lnEdgeType, fromID[:8], toID[:8]),
+			Summary: fmt.Sprintf("%s: %s → %s", lnEdgeType, truncate(fromID, 8), truncate(toID, 8)),
 		}
 
 		p, err := svc.proposal.Create(cmd.Context(), []model.ProposalOperation{op})
 		if err != nil {
-			os.Exit(outputError(err))
-			return nil
+			return err
 		}
 
 		output(p)

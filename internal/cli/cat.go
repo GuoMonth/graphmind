@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/senguoyun-guosheng/graphmind/internal/model"
 	"github.com/spf13/cobra"
@@ -15,10 +14,8 @@ var catCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := wireAndMigrate(); err != nil {
-			os.Exit(outputError(err))
-			return nil
+			return err
 		}
-		defer svc.db.Close()
 
 		id := args[0]
 		ctx := cmd.Context()
@@ -48,7 +45,6 @@ var catCmd = &cobra.Command{
 			return nil
 		}
 
-		os.Exit(outputError(fmt.Errorf("%w: no entity with id %s", model.ErrNotFound, id)))
-		return nil
+		return fmt.Errorf("%w: no entity with id %s", model.ErrNotFound, id)
 	},
 }

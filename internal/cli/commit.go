@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 )
 
@@ -13,15 +11,12 @@ var commitCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := wireAndMigrate(); err != nil {
-			os.Exit(outputError(err))
-			return nil
+			return err
 		}
-		defer svc.db.Close()
 
 		p, err := svc.proposal.Commit(cmd.Context(), args[0])
 		if err != nil {
-			os.Exit(outputError(err))
-			return nil
+			return err
 		}
 
 		output(p)
@@ -36,15 +31,12 @@ var rejectCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := wireAndMigrate(); err != nil {
-			os.Exit(outputError(err))
-			return nil
+			return err
 		}
-		defer svc.db.Close()
 
 		p, err := svc.proposal.Reject(cmd.Context(), args[0])
 		if err != nil {
-			os.Exit(outputError(err))
-			return nil
+			return err
 		}
 
 		output(p)

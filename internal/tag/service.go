@@ -3,6 +3,7 @@ package tag
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -61,7 +62,7 @@ func (s *Service) GetTagByName(ctx context.Context, tx *sql.Tx, name string) (*m
 	err := tx.QueryRowContext(ctx,
 		`SELECT id, name, description, created_at, updated_at FROM tags WHERE name = ?`, name,
 	).Scan(&t.ID, &t.Name, &t.Description, &createdAt, &updatedAt)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("%w: tag", model.ErrNotFound)
 	}
 	if err != nil {
@@ -79,7 +80,7 @@ func (s *Service) GetTag(ctx context.Context, id string) (*model.Tag, error) {
 	err := s.db.QueryRowContext(ctx,
 		`SELECT id, name, description, created_at, updated_at FROM tags WHERE id = ?`, id,
 	).Scan(&t.ID, &t.Name, &t.Description, &createdAt, &updatedAt)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("%w: tag", model.ErrNotFound)
 	}
 	if err != nil {
@@ -96,7 +97,7 @@ func (s *Service) getTagTx(ctx context.Context, tx *sql.Tx, id string) (*model.T
 	err := tx.QueryRowContext(ctx,
 		`SELECT id, name, description, created_at, updated_at FROM tags WHERE id = ?`, id,
 	).Scan(&t.ID, &t.Name, &t.Description, &createdAt, &updatedAt)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("%w: tag", model.ErrNotFound)
 	}
 	if err != nil {

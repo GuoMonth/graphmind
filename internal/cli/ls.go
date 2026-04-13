@@ -1,9 +1,10 @@
 package cli
 
 import (
-	"os"
+	"fmt"
 
 	"github.com/senguoyun-guosheng/graphmind/internal/graph"
+	"github.com/senguoyun-guosheng/graphmind/internal/model"
 	"github.com/senguoyun-guosheng/graphmind/internal/proposal"
 	"github.com/senguoyun-guosheng/graphmind/internal/tag"
 	"github.com/spf13/cobra"
@@ -22,10 +23,8 @@ var lsCmd = &cobra.Command{
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := wireAndMigrate(); err != nil {
-			os.Exit(outputError(err))
-			return nil
+			return err
 		}
-		defer svc.db.Close()
 
 		entity := "node"
 		if len(args) > 0 {
@@ -43,8 +42,7 @@ var lsCmd = &cobra.Command{
 				After:  lsAfter,
 			})
 			if err != nil {
-				os.Exit(outputError(err))
-				return nil
+				return err
 			}
 			output(nodes)
 
@@ -55,8 +53,7 @@ var lsCmd = &cobra.Command{
 				After: lsAfter,
 			})
 			if err != nil {
-				os.Exit(outputError(err))
-				return nil
+				return err
 			}
 			output(edges)
 
@@ -66,8 +63,7 @@ var lsCmd = &cobra.Command{
 				After: lsAfter,
 			})
 			if err != nil {
-				os.Exit(outputError(err))
-				return nil
+				return err
 			}
 			output(tags)
 
@@ -78,26 +74,17 @@ var lsCmd = &cobra.Command{
 				After:  lsAfter,
 			})
 			if err != nil {
-				os.Exit(outputError(err))
-				return nil
+				return err
 			}
 			output(proposals)
 
 		default:
-			os.Exit(outputError(&entityError{entity}))
-			return nil
+			return fmt.Errorf("%w: unknown entity type: %s (expected: node, edge, tag, proposal)",
+				model.ErrInvalidInput, entity)
 		}
 
 		return nil
 	},
-}
-
-type entityError struct {
-	entity string
-}
-
-func (e *entityError) Error() string {
-	return "unknown entity type: " + e.entity + " (expected: node, edge, tag, proposal)"
 }
 
 func init() {

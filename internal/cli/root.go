@@ -34,9 +34,17 @@ type services struct {
 var svc services
 
 var rootCmd = &cobra.Command{
-	Use:          "gm",
-	Short:        "GraphMind — graph-based project management for AI agents",
-	SilenceUsage: true,
+	Use:           "gm",
+	Short:         "GraphMind — graph-based project management for AI agents",
+	SilenceUsage:  true,
+	SilenceErrors: true,
+	PersistentPostRunE: func(_ *cobra.Command, _ []string) error {
+		if svc.db != nil {
+			svc.db.Close()
+			svc.db = nil
+		}
+		return nil
+	},
 }
 
 func init() {
@@ -54,9 +62,12 @@ func init() {
 	rootCmd.AddCommand(catCmd)
 }
 
-// Execute runs the root command.
-func Execute() error {
-	return rootCmd.Execute()
+// Execute runs the root command and handles exit codes.
+func Execute() {
+	if err := rootCmd.Execute(); err != nil {
+		code := outputError(err)
+		os.Exit(code)
+	}
 }
 
 // wireServices opens the database and wires all services.
@@ -118,6 +129,14 @@ func outputError(err error) int {
 	}
 
 	return exitCode
+}
+
+// truncate returns at most the first n characters of s.
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n]
 }
 
 func writeJSON(v any) {

@@ -71,7 +71,7 @@ func (s *Service) List(ctx context.Context, f ListFilter) ([]model.Event, error)
 		args = append(args, f.Action)
 	}
 	if f.After != "" {
-		query += " AND id > ?"
+		query += " AND id < ?"
 		args = append(args, f.After)
 	}
 

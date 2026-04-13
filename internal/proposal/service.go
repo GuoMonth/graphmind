@@ -298,7 +298,7 @@ func (s *Service) List(ctx context.Context, f ListFilter) ([]model.Proposal, err
 		args = append(args, f.Status)
 	}
 	if f.After != "" {
-		query += " AND id > ?"
+		query += " AND id < ?"
 		args = append(args, f.After)
 	}
 
