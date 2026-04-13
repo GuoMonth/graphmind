@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/senguoyun-guosheng/graphmind/internal/model"
@@ -69,18 +70,18 @@ Use this to inspect any entity after listing with "gm ls".`,
   # {"ok":false,"error":{"code":"NOT_FOUND","message":"not found: no entity with id 019..."}}`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := wireAndMigrate(cmd.Context()); err != nil {
-			return err
-		}
-
 		id := args[0]
 		ctx := cmd.Context()
 
-		// Try node first, then edge, then tag, then proposal
+		// Try node first, then edge, then tag, then proposal.
+		// Only fall through on ErrNotFound; surface all other errors.
 		node, err := svc.graph.GetNode(ctx, id)
 		if err == nil {
 			output(node)
 			return nil
+		}
+		if !errors.Is(err, model.ErrNotFound) {
+			return err
 		}
 
 		edge, err := svc.graph.GetEdge(ctx, id)
@@ -88,17 +89,26 @@ Use this to inspect any entity after listing with "gm ls".`,
 			output(edge)
 			return nil
 		}
+		if !errors.Is(err, model.ErrNotFound) {
+			return err
+		}
 
 		t, err := svc.tag.GetTag(ctx, id)
 		if err == nil {
 			output(t)
 			return nil
 		}
+		if !errors.Is(err, model.ErrNotFound) {
+			return err
+		}
 
 		p, err := svc.proposal.Get(ctx, id)
 		if err == nil {
 			output(p)
 			return nil
+		}
+		if !errors.Is(err, model.ErrNotFound) {
+			return err
 		}
 
 		return fmt.Errorf("%w: no entity with id %s", model.ErrNotFound, id)

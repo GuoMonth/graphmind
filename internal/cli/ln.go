@@ -67,10 +67,6 @@ CYCLE DETECTION
   # {"ok":false,"error":{"code":"NOT_FOUND","message":"not found: from_id node does not exist"}}`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := wireAndMigrate(cmd.Context()); err != nil {
-			return err
-		}
-
 		fromID := args[0]
 		toID := args[1]
 

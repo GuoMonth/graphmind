@@ -143,6 +143,14 @@ Use "gm <command> --help" for detailed usage, examples, and output samples.`,
 }
 
 func init() {
+	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
+		// init handles its own DB setup; skip for root-only (help/version)
+		if cmd.Name() == "init" || cmd.Parent() == nil {
+			return nil
+		}
+		return wireAndMigrate(cmd.Context())
+	}
+
 	rootCmd.PersistentFlags().StringVar(&dbPath, "db", ".graphmind/graph.db", "Path to SQLite database")
 	rootCmd.PersistentFlags().BoolVar(&quiet, "quiet", false, "Suppress stdout, exit code only")
 	rootCmd.PersistentFlags().BoolVar(&pretty, "pretty", false, "Pretty-print JSON")
@@ -227,12 +235,13 @@ func outputError(err error) int {
 	return exitCode
 }
 
-// truncate returns at most the first n characters of s.
+// truncate returns at most the first n runes of s.
 func truncate(s string, n int) string {
-	if len(s) <= n {
+	r := []rune(s)
+	if len(r) <= n {
 		return s
 	}
-	return s[:n]
+	return string(r[:n])
 }
 
 func writeJSON(v any) {

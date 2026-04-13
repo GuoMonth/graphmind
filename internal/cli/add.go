@@ -67,10 +67,6 @@ STDIN FORMAT
   # Error — missing type:
   # {"ok":false,"error":{"code":"INVALID_INPUT","message":"invalid input: node type required"}}`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		if err := wireAndMigrate(cmd.Context()); err != nil {
-			return err
-		}
-
 		data := map[string]any{ // proposal operation data uses any
 			"type":        addType,
 			"title":       addTitle,
@@ -94,8 +90,12 @@ STDIN FORMAT
 			}
 		}
 
-		title, _ := data["title"].(string)
 		nodeType, _ := data["type"].(string)
+		if !model.IsValidNodeType(nodeType) {
+			return fmt.Errorf("%w: invalid node type %q", model.ErrInvalidInput, nodeType)
+		}
+
+		title, _ := data["title"].(string)
 		op := model.ProposalOperation{
 			Action:  model.OpCreateNode,
 			Entity:  "node",

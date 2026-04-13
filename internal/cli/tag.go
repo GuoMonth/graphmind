@@ -49,10 +49,6 @@ is committed. If it already exists, the existing tag is reused.`,
   # {"ok":false,"error":{"code":"NOT_FOUND","message":"not found: node does not exist"}}`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := wireAndMigrate(cmd.Context()); err != nil {
-			return err
-		}
-
 		nodeID := args[0]
 		tagName := args[1]
 

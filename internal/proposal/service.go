@@ -74,20 +74,20 @@ func (s *Service) Create(ctx context.Context, operations []model.ProposalOperati
 
 // Commit applies all operations in a pending proposal atomically.
 func (s *Service) Commit(ctx context.Context, proposalID string) (*model.Proposal, error) {
-	p, err := s.Get(ctx, proposalID)
-	if err != nil {
-		return nil, err
-	}
-
-	if p.Status != model.ProposalStatusPending {
-		return nil, fmt.Errorf("%w: proposal is %s, not pending", model.ErrInvalidState, p.Status)
-	}
-
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback()
+
+	// Fetch and lock the proposal inside the transaction
+	p, err := s.getTx(ctx, tx, proposalID)
+	if err != nil {
+		return nil, err
+	}
+	if p.Status != model.ProposalStatusPending {
+		return nil, fmt.Errorf("%w: proposal is %s, not pending", model.ErrInvalidState, p.Status)
+	}
 
 	// Track created entity IDs for internal references
 	createdIDs := make(map[int]string)
@@ -124,20 +124,20 @@ func (s *Service) Commit(ctx context.Context, proposalID string) (*model.Proposa
 
 // Reject marks a pending proposal as rejected.
 func (s *Service) Reject(ctx context.Context, proposalID string) (*model.Proposal, error) {
-	p, err := s.Get(ctx, proposalID)
-	if err != nil {
-		return nil, err
-	}
-
-	if p.Status != model.ProposalStatusPending {
-		return nil, fmt.Errorf("%w: proposal is %s, not pending", model.ErrInvalidState, p.Status)
-	}
-
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback()
+
+	// Fetch and lock the proposal inside the transaction
+	p, err := s.getTx(ctx, tx, proposalID)
+	if err != nil {
+		return nil, err
+	}
+	if p.Status != model.ProposalStatusPending {
+		return nil, fmt.Errorf("%w: proposal is %s, not pending", model.ErrInvalidState, p.Status)
+	}
 
 	now := time.Now().UTC().Format(model.TimeFormat)
 	_, err = tx.ExecContext(ctx,
@@ -259,12 +259,23 @@ func (s *Service) applyTagNode(
 
 // Get retrieves a proposal by ID.
 func (s *Service) Get(ctx context.Context, id string) (*model.Proposal, error) {
+	return s.scanProposal(s.db.QueryRowContext(ctx,
+		`SELECT id, status, operations, created_at, updated_at FROM proposals WHERE id = ?`, id,
+	))
+}
+
+// getTx retrieves a proposal by ID within an existing transaction.
+func (s *Service) getTx(ctx context.Context, tx *sql.Tx, id string) (*model.Proposal, error) {
+	return s.scanProposal(tx.QueryRowContext(ctx,
+		`SELECT id, status, operations, created_at, updated_at FROM proposals WHERE id = ?`, id,
+	))
+}
+
+func (s *Service) scanProposal(row *sql.Row) (*model.Proposal, error) {
 	var p model.Proposal
 	var opsJSON, createdAt, updatedAt string
 
-	err := s.db.QueryRowContext(ctx,
-		`SELECT id, status, operations, created_at, updated_at FROM proposals WHERE id = ?`, id,
-	).Scan(&p.ID, &p.Status, &opsJSON, &createdAt, &updatedAt)
+	err := row.Scan(&p.ID, &p.Status, &opsJSON, &createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("%w: proposal", model.ErrNotFound)
 	}
@@ -302,6 +313,7 @@ func (s *Service) List(ctx context.Context, f ListFilter) ([]model.Proposal, err
 		args = append(args, f.Status)
 	}
 	if f.After != "" {
+		// Cursor pagination: UUIDv7 IDs are time-ordered (RFC 9562).
 		query += " AND id < ?"
 		args = append(args, f.After)
 	}

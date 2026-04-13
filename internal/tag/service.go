@@ -140,7 +140,10 @@ func (s *Service) TagNode(ctx context.Context, tx *sql.Tx, input NodeInput) (*mo
 	err := tx.QueryRowContext(ctx,
 		"SELECT COUNT(*) FROM nodes WHERE id = ?", input.NodeID,
 	).Scan(&nodeExists)
-	if err != nil || nodeExists == 0 {
+	if err != nil {
+		return nil, fmt.Errorf("check node exists: %w", err)
+	}
+	if nodeExists == 0 {
 		return nil, fmt.Errorf("%w: node does not exist", model.ErrNotFound)
 	}
 

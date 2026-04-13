@@ -82,13 +82,14 @@ PAGINATION
   #   "message":"invalid input: unknown entity type: foo (expected: node, edge, tag, proposal)"}}`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := wireAndMigrate(cmd.Context()); err != nil {
-			return err
-		}
-
 		entity := "node"
 		if len(args) > 0 {
 			entity = args[0]
+		}
+
+		const maxLimit = 1000
+		if lsLimit > maxLimit {
+			lsLimit = maxLimit
 		}
 
 		ctx := cmd.Context()

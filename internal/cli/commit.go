@@ -42,10 +42,6 @@ Only proposals with status "pending" can be committed.`,
   # {"ok":false,"error":{"code":"NOT_FOUND","message":"not found: proposal"}}`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := wireAndMigrate(cmd.Context()); err != nil {
-			return err
-		}
-
 		p, err := svc.proposal.Commit(cmd.Context(), args[0])
 		if err != nil {
 			return err
@@ -83,10 +79,6 @@ Only proposals with status "pending" can be rejected.`,
   #   "message":"invalid state: proposal is committed, not pending"}}`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := wireAndMigrate(cmd.Context()); err != nil {
-			return err
-		}
-
 		p, err := svc.proposal.Reject(cmd.Context(), args[0])
 		if err != nil {
 			return err
