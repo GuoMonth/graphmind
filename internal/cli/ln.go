@@ -70,6 +70,10 @@ CYCLE DETECTION
 		fromID := args[0]
 		toID := args[1]
 
+		if !model.IsValidEdgeType(lnEdgeType) {
+			return fmt.Errorf("%w: invalid edge type %q", model.ErrInvalidInput, lnEdgeType)
+		}
+
 		op := model.ProposalOperation{
 			Action: model.OpCreateEdge,
 			Entity: "edge",

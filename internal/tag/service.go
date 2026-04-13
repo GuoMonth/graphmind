@@ -150,6 +150,9 @@ func (s *Service) TagNode(ctx context.Context, tx *sql.Tx, input NodeInput) (*mo
 	// Upsert tag: find or create
 	t, err := s.GetTagByName(ctx, tx, input.TagName)
 	if err != nil {
+		if !errors.Is(err, model.ErrNotFound) {
+			return nil, fmt.Errorf("get tag by name: %w", err)
+		}
 		// Tag doesn't exist, create it
 		t, err = s.CreateTag(ctx, tx, CreateTagInput{
 			Name:        input.TagName,

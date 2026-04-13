@@ -75,8 +75,8 @@ STDIN FORMAT
 		}
 
 		// If stdin has data, use it instead of flags
-		stat, _ := os.Stdin.Stat()
-		if (stat.Mode() & os.ModeCharDevice) == 0 {
+		stat, err := os.Stdin.Stat()
+		if err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
 			input, err := io.ReadAll(os.Stdin)
 			if err != nil {
 				return fmt.Errorf("%w: read stdin: %s", model.ErrInvalidInput, err)
