@@ -138,7 +138,7 @@ Tags are the search funnel entry point. AI agents extract 2–5 tags per node, c
 
 | | |
 |---|---|
-| Language | Go 1.25 |
+| Language | Go 1.26 |
 | Storage | SQLite (`modernc.org/sqlite`, pure Go, no CGO) |
 | Primary Keys | UUID v7 (time-ordered, RFC 9562) |
 | Interface | CLI with JSON envelope protocol |
