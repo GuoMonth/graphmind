@@ -9,8 +9,7 @@ linters:
     # Bug detection
     - errcheck          # Unchecked errors
     - govet             # Go vet checks
-    - staticcheck       # Advanced static analysis
-    - gosimple          # Code simplifications
+    - staticcheck       # Advanced static analysis (includes gosimple)
     - ineffassign       # Ineffectual assignments
     - unused            # Unused code
 
@@ -39,6 +38,61 @@ linters:
     - funlen            # Function length (lines + statements)
     - lll               # Line length limit
 
+  settings:
+    # Complexity
+    gocyclo:
+      min-complexity: 15
+    cyclop:
+      max-complexity: 15
+    funlen:
+      lines: 80
+      statements: 50
+      ignore-comments: true
+    lll:
+      line-length: 140
+      tab-width: 4
+    nakedret:
+      max-func-lines: 30
+
+    # Code quality
+    revive:
+      rules:
+        - name: exported
+        - name: var-naming
+        - name: blank-imports
+        - name: context-as-argument
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: increment-decrement
+        - name: var-declaration
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unreachable-code
+        - name: redefines-builtin-id
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+    misspell:
+      locale: US
+    errcheck:
+      exclude-functions:
+        - (*os.File).Close
+        - (io.Closer).Close
+        - (*database/sql.DB).Close
+        - (*database/sql.Tx).Rollback
+        - (*database/sql.Rows).Close
+        - (*encoding/json.Encoder).Encode
+
   exclusions:
     presets:
       - comments
@@ -50,58 +104,7 @@ linters:
           - cyclop
           - lll
           - errcheck
-
-settings:
-  # Complexity
-  gocyclo:
-    min-complexity: 15
-  cyclop:
-    max-complexity: 15
-    skip-tests: true
-  funlen:
-    lines: 80
-    statements: 50
-    ignore-comments: true
-  lll:
-    line-length: 140
-    tab-width: 4
-  nakedret:
-    max-func-lines: 30
-
-  # Code quality
-  revive:
-    rules:
-      - name: exported
-      - name: var-naming
-      - name: blank-imports
-      - name: context-as-argument
-      - name: dot-imports
-      - name: error-return
-      - name: error-strings
-      - name: error-naming
-      - name: increment-decrement
-      - name: var-declaration
-      - name: range
-      - name: receiver-naming
-      - name: time-naming
-      - name: unexported-return
-      - name: indent-error-flow
-      - name: errorf
-      - name: empty-block
-      - name: superfluous-else
-      - name: unreachable-code
-      - name: redefines-builtin-id
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-  misspell:
-    locale: US
-  errcheck:
-    exclude-functions:
-      - (*os.File).Close
-      - (io.Closer).Close
+          - unparam
 
 formatters:
   enable:

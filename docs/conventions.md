@@ -19,7 +19,9 @@ The `gm` CLI is consumed by AI agents. **One concept = one word, everywhere.** C
 | `event` | An immutable record of a past mutation |
 | `graph` | The overall structure (virtual, not a DB table) |
 
-### Canonical actions
+### Canonical actions (internal vocabulary)
+
+Used in Go code, event types, JSON fields, and database. CLI commands use Unix aliases (see below).
 
 | Word | Meaning |
 |---|---|
@@ -33,6 +35,23 @@ The `gm` CLI is consumed by AI agents. **One concept = one word, everywhere.** C
 | `traverse` | Walk the graph following edges |
 | `commit` / `reject` | Apply or discard a pending proposal |
 | `tag` / `untag` | Associate or remove a tag on a node |
+
+### CLI command names (Unix aliases)
+
+CLI commands use Unix standard names for zero learning curve. Internal vocabulary stays canonical.
+
+| CLI verb | Internal action | Unix analog |
+|---|---|---|
+| `add` | `create` | `touch` |
+| `cat` | `get` | `cat` |
+| `ls` | `list` | `ls` |
+| `mv` | `update` | `mv` |
+| `rm` | `delete` | `rm` |
+| `grep` | `search` | `grep` |
+| `find` | `query` | `find` |
+| `tree` | `traverse` | `tree` |
+| `ln` | `create` (edge) | `ln` |
+| `log` | `list` (events) | `git log` |
 
 ### Banned synonyms
 
@@ -71,7 +90,7 @@ Everything else spelled out: `reference` not `ref`, `description` not `desc`, `p
 
 ### Naming patterns
 
-- CLI commands: `gm <singular-noun> <verb> [--flag-name value]`
+- CLI commands: `gm <verb> [entity|id] [--flag-name value]`
 - Event types: `{entity}_{past_tense_verb}` -- e.g., `node_created`, `proposal_committed`
 - Proposal operations: `{verb}_{entity}` -- e.g., `create_node`, `tag_node`
 - Go types: `{Action}{Entity}{Suffix}` -- e.g., `CreateNodeInput`, `GraphQueryResult`
