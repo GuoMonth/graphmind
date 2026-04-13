@@ -3,12 +3,14 @@
 BINARY_NAME = gm
 BUILD_DIR   = ./bin
 CMD_DIR     = ./cmd/gm
+VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+LDFLAGS     = -ldflags "-X main.version=$(VERSION)"
 
 ## Build ──────────────────────────────────────────────────────────────────────
 
 build:
 	@mkdir -p $(BUILD_DIR)
-	go build -o $(BUILD_DIR)/$(BINARY_NAME) $(CMD_DIR)
+	go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(CMD_DIR)
 
 ## Test ───────────────────────────────────────────────────────────────────────
 

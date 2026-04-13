@@ -146,7 +146,7 @@ func TestCreateNodeEmptyTitle(t *testing.T) {
 func TestCreateNodeAllTypes(t *testing.T) {
 	env := setup(t)
 
-	for nodeType := range model.ValidNodeTypes {
+	for _, nodeType := range model.AllNodeTypes() {
 		t.Run(nodeType, func(t *testing.T) {
 			tx := env.beginTx(t)
 			_, err := env.graph.CreateNode(env.ctx, tx, graph.CreateNodeInput{
@@ -248,7 +248,7 @@ func TestCreateEdge(t *testing.T) {
 func TestCreateEdgeAllTypes(t *testing.T) {
 	env := setup(t)
 
-	for edgeType := range model.ValidEdgeTypes {
+	for _, edgeType := range model.AllEdgeTypes() {
 		t.Run(edgeType, func(t *testing.T) {
 			a := env.createNode(t, "task", "From "+edgeType)
 			b := env.createNode(t, "task", "To "+edgeType)

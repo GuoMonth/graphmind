@@ -34,7 +34,7 @@ type CreateNodeInput struct {
 
 // CreateNode creates a new node within the given transaction.
 func (s *Service) CreateNode(ctx context.Context, tx *sql.Tx, input CreateNodeInput) (*model.Node, error) {
-	if !model.ValidNodeTypes[input.Type] {
+	if !model.IsValidNodeType(input.Type) {
 		return nil, fmt.Errorf("%w: invalid node type %q", model.ErrInvalidInput, input.Type)
 	}
 	if input.Title == "" {
@@ -129,6 +129,8 @@ func (s *Service) ListNodes(ctx context.Context, f ListNodesFilter) ([]model.Nod
 		args = append(args, f.Status)
 	}
 	if f.After != "" {
+		// Cursor pagination: UUIDv7 IDs are time-ordered (RFC 9562), so
+		// "id < after" gives deterministic descending-time pagination.
 		query += " AND id < ?"
 		args = append(args, f.After)
 	}
@@ -220,7 +222,7 @@ func (s *Service) CreateEdge(ctx context.Context, tx *sql.Tx, input CreateEdgeIn
 func (s *Service) validateEdgeInput(
 	ctx context.Context, tx *sql.Tx, input CreateEdgeInput,
 ) error {
-	if !model.ValidEdgeTypes[input.Type] {
+	if !model.IsValidEdgeType(input.Type) {
 		return fmt.Errorf("%w: invalid edge type %q", model.ErrInvalidInput, input.Type)
 	}
 	if input.FromID == "" || input.ToID == "" {
@@ -248,7 +250,7 @@ func (s *Service) validateEdgeInput(
 		return fmt.Errorf("%w: to_id node does not exist", model.ErrNotFound)
 	}
 
-	if model.DirectionalEdgeTypes[input.Type] {
+	if model.IsDirectionalEdgeType(input.Type) {
 		return s.detectCycle(ctx, tx, input.Type, input.FromID, input.ToID)
 	}
 	return nil
@@ -341,6 +343,7 @@ func (s *Service) ListEdges(ctx context.Context, f ListEdgesFilter) ([]model.Edg
 		args = append(args, f.ToID)
 	}
 	if f.After != "" {
+		// Cursor pagination: UUIDv7 IDs are time-ordered (RFC 9562).
 		query += " AND id < ?"
 		args = append(args, f.After)
 	}

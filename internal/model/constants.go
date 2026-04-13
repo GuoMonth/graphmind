@@ -1,5 +1,7 @@
 package model
 
+import "slices"
+
 // Envelope is the standard JSON output wrapper.
 type Envelope struct {
 	OK    bool       `json:"ok"`
@@ -64,8 +66,8 @@ const (
 	OpTagNode    = "tag_node"
 )
 
-// ValidNodeTypes is the set of allowed node types.
-var ValidNodeTypes = map[string]bool{
+// validNodeTypes is the set of allowed node types.
+var validNodeTypes = map[string]bool{
 	NodeTypeTask:       true,
 	NodeTypeEpic:       true,
 	NodeTypeDecision:   true,
@@ -74,8 +76,8 @@ var ValidNodeTypes = map[string]bool{
 	NodeTypeDiscussion: true,
 }
 
-// ValidEdgeTypes is the set of allowed edge types.
-var ValidEdgeTypes = map[string]bool{
+// validEdgeTypes is the set of allowed edge types.
+var validEdgeTypes = map[string]bool{
 	EdgeTypeDependsOn:  true,
 	EdgeTypeBlocks:     true,
 	EdgeTypeDecompose:  true,
@@ -84,11 +86,40 @@ var ValidEdgeTypes = map[string]bool{
 	EdgeTypeSupersedes: true,
 }
 
-// DirectionalEdgeTypes are edge types that should be checked for cycles.
-var DirectionalEdgeTypes = map[string]bool{
+// directionalEdgeTypes are edge types that should be checked for cycles.
+var directionalEdgeTypes = map[string]bool{
 	EdgeTypeDependsOn:  true,
 	EdgeTypeBlocks:     true,
 	EdgeTypeDecompose:  true,
 	EdgeTypeCausedBy:   true,
 	EdgeTypeSupersedes: true,
+}
+
+// IsValidNodeType reports whether t is a recognized node type.
+func IsValidNodeType(t string) bool { return validNodeTypes[t] }
+
+// IsValidEdgeType reports whether t is a recognized edge type.
+func IsValidEdgeType(t string) bool { return validEdgeTypes[t] }
+
+// IsDirectionalEdgeType reports whether t requires cycle detection.
+func IsDirectionalEdgeType(t string) bool { return directionalEdgeTypes[t] }
+
+// AllNodeTypes returns all valid node type strings in sorted order.
+func AllNodeTypes() []string {
+	types := make([]string, 0, len(validNodeTypes))
+	for t := range validNodeTypes {
+		types = append(types, t)
+	}
+	slices.Sort(types)
+	return types
+}
+
+// AllEdgeTypes returns all valid edge type strings in sorted order.
+func AllEdgeTypes() []string {
+	types := make([]string, 0, len(validEdgeTypes))
+	for t := range validEdgeTypes {
+		types = append(types, t)
+	}
+	slices.Sort(types)
+	return types
 }
