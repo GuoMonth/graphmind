@@ -20,7 +20,67 @@ var (
 var lsCmd = &cobra.Command{
 	Use:   "ls [node|edge|tag|proposal]",
 	Short: "List entities with filters",
-	Args:  cobra.MaximumNArgs(1),
+	Long: `List entities in the graph. Defaults to listing nodes if no entity type given.
+
+Supports filtering by type and status, pagination via --limit and --after.
+Returns an array of entities wrapped in the standard JSON envelope.
+
+ENTITY TYPES
+  node       Project entities (task, epic, decision, risk, release, discussion)
+  edge       Relationships between nodes
+  tag        Semantic labels
+  proposal   Staged change batches (filter by status: pending, committed, rejected)
+
+PAGINATION
+  --limit N        Max results to return (default 50)
+  --after <cursor>  Cursor-based pagination. For nodes/edges/proposals, pass the last
+                   item's ID. For tags, pass the last tag's name.`,
+	Example: `  # List all nodes (default entity)
+  gm ls
+
+  # List nodes filtered by type
+  gm ls node --type task
+
+  # List nodes filtered by type and status
+  gm ls node --type task --status active
+
+  # List edges of a specific type
+  gm ls edge --type depends_on
+
+  # List all tags
+  gm ls tag
+
+  # List pending proposals
+  gm ls proposal --status pending
+
+  # Pagination: get first 10, then next 10
+  gm ls node --limit 10
+  gm ls node --limit 10 --after 019abc...
+
+  # Output (array of entities):
+  # {
+  #   "ok": true,
+  #   "data": [
+  #     {
+  #       "id": "019abc...",
+  #       "type": "task",
+  #       "title": "Build auth module",
+  #       "description": "",
+  #       "status": "",
+  #       "properties": {},
+  #       "created_at": "2025-01-15T10:30:00.000Z",
+  #       "updated_at": "2025-01-15T10:30:00.000Z"
+  #     }
+  #   ]
+  # }
+
+  # Empty result (no error, just empty array):
+  # {"ok":true,"data":[]}
+
+  # Error — unknown entity type:
+  # {"ok":false,"error":{"code":"INVALID_INPUT",
+  #   "message":"invalid input: unknown entity type: foo (expected: node, edge, tag, proposal)"}}`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := wireAndMigrate(cmd.Context()); err != nil {
 			return err

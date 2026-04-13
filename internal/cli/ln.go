@@ -12,8 +12,60 @@ var lnEdgeType string
 var lnCmd = &cobra.Command{
 	Use:   "ln <from-id> <to-id>",
 	Short: "Create an edge → proposal",
-	Long:  "Create a directed edge between two nodes. Returns a pending proposal.",
-	Args:  cobra.ExactArgs(2),
+	Long: `Create a directed edge between two nodes. Returns a pending proposal.
+
+The edge is NOT created immediately. A proposal is returned with status
+"pending". Call "gm commit <proposal-id>" to apply it.
+
+Both <from-id> and <to-id> must be valid existing node IDs. The --type
+flag specifies the relationship kind.
+
+EDGE TYPES
+  depends_on   from depends on to (directional, cycle-checked)
+  blocks       from blocks to (directional, cycle-checked)
+  decompose    from decomposes into to (directional, cycle-checked)
+  caused_by    from is caused by to (directional, cycle-checked)
+  supersedes   from supersedes to (directional, cycle-checked)
+  related_to   bidirectional association (NO cycle check)
+
+CYCLE DETECTION
+  Directional edges are checked for same-type cycles using a recursive
+  traversal. If adding the edge would form a cycle of the same edge type,
+  the command fails with exit code 3 (CONFLICT).`,
+	Example: `  # Create a dependency edge
+  gm ln 019abc... 019def... --type depends_on
+
+  # Create a decomposition (parent → child)
+  gm ln 019epic... 019task... --type decompose
+
+  # Create a bidirectional relation (no cycle check)
+  gm ln 019a... 019b... --type related_to
+
+  # Output (proposal with status "pending"):
+  # {
+  #   "ok": true,
+  #   "data": {
+  #     "id": "019...",
+  #     "status": "pending",
+  #     "operations": [
+  #       {
+  #         "action": "create_edge",
+  #         "entity": "edge",
+  #         "data": {"type":"depends_on","from_id":"019abc...","to_id":"019def..."},
+  #         "summary": "depends_on: 019abc... → 019def..."
+  #       }
+  #     ],
+  #     "created_at": "2025-01-15T10:30:00.000Z",
+  #     "updated_at": "2025-01-15T10:30:00.000Z"
+  #   }
+  # }
+
+  # Error — cycle detected:
+  # {"ok":false,"error":{"code":"CONFLICT","message":"conflict: edge would create a depends_on cycle"}}
+
+  # Error — node not found:
+  # {"ok":false,"error":{"code":"NOT_FOUND","message":"not found: source node does not exist"}}`,
+	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := wireAndMigrate(cmd.Context()); err != nil {
 			return err

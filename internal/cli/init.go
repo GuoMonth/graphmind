@@ -10,6 +10,20 @@ import (
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize graph database",
+	Long: `Initialize the GraphMind SQLite database at the path specified by --db.
+
+Creates the database file and directory if they do not exist, then runs
+all schema migrations (nodes, edges, tags, proposals, events, FTS5 index).
+
+Safe to run multiple times — migrations are idempotent.`,
+	Example: `  # Initialize with default path (.graphmind/graph.db)
+  gm init
+
+  # Initialize with custom path
+  gm init --db /tmp/project.db
+
+  # Output on success:
+  # {"ok":true,"data":{"status":"initialized","db_path":".graphmind/graph.db"}}`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		database, err := db.Open(dbPath)
 		if err != nil {
