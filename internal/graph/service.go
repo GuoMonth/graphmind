@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/senguoyun-guosheng/graphmind/internal/event"
@@ -105,6 +106,211 @@ func (s *Service) scanNode(row *sql.Row) (*model.Node, error) {
 	}
 
 	return &n, nil
+}
+
+// UpdateNodeInput defines the input for updating a node. Empty fields are not updated.
+type UpdateNodeInput struct {
+	ID          string         `json:"id"`
+	Type        string         `json:"type"`
+	Title       string         `json:"title"`
+	Description *string        `json:"description"` // pointer to distinguish "" from unset
+	Status      string         `json:"status"`
+	Properties  map[string]any `json:"properties"` // JSON flexible properties
+}
+
+// mergeProperties overlays incoming onto existing and returns the serialized JSON.
+func mergeProperties(existing, incoming map[string]any) ([]byte, error) { // JSON flexible properties
+	merged := existing
+	if merged == nil {
+		merged = map[string]any{} // JSON flexible properties
+	}
+	for k, v := range incoming {
+		merged[k] = v
+	}
+	return json.Marshal(merged)
+}
+
+// UpdateNode applies a partial update to an existing node within the given transaction.
+func (s *Service) UpdateNode(ctx context.Context, tx *sql.Tx, input *UpdateNodeInput) (*model.Node, error) {
+	if input.ID == "" {
+		return nil, fmt.Errorf("%w: id is required", model.ErrInvalidInput)
+	}
+
+	// Verify node exists
+	existing, err := s.getNodeTx(ctx, tx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build dynamic UPDATE
+	sets := []string{}
+	args := []any{} // sql args require any
+
+	if input.Type != "" {
+		if !model.IsValidNodeType(input.Type) {
+			return nil, fmt.Errorf("%w: invalid node type %q", model.ErrInvalidInput, input.Type)
+		}
+		sets = append(sets, "type = ?")
+		args = append(args, input.Type)
+	}
+	if input.Title != "" {
+		sets = append(sets, "title = ?")
+		args = append(args, input.Title)
+	}
+	if input.Description != nil {
+		sets = append(sets, "description = ?")
+		args = append(args, *input.Description)
+	}
+	if input.Status != "" {
+		sets = append(sets, "status = ?")
+		args = append(args, input.Status)
+	}
+	if input.Properties != nil {
+		mergedJSON, err := mergeProperties(existing.Properties, input.Properties)
+		if err != nil {
+			return nil, err
+		}
+		sets = append(sets, "properties = ?")
+		args = append(args, string(mergedJSON))
+	}
+
+	if len(sets) == 0 {
+		return nil, fmt.Errorf("%w: no fields to update", model.ErrInvalidInput)
+	}
+
+	sets = append(sets, "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')")
+	args = append(args, input.ID)
+
+	query := "UPDATE nodes SET " + strings.Join(sets, ", ") + " WHERE id = ?"
+	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
+		return nil, fmt.Errorf("update node: %w", err)
+	}
+
+	if err := s.event.Append(ctx, tx, "node", input.ID, model.ActionNodeUpdated, input); err != nil {
+		return nil, fmt.Errorf("append node_updated event: %w", err)
+	}
+
+	return s.getNodeTx(ctx, tx, input.ID)
+}
+
+// DeleteNode removes a node and its associated edges and tag associations.
+func (s *Service) DeleteNode(ctx context.Context, tx *sql.Tx, id string) error {
+	if id == "" {
+		return fmt.Errorf("%w: id is required", model.ErrInvalidInput)
+	}
+
+	// Verify node exists
+	if _, err := s.getNodeTx(ctx, tx, id); err != nil {
+		return err
+	}
+
+	// Cascade: delete edges referencing this node
+	if _, err := tx.ExecContext(ctx,
+		"DELETE FROM edges WHERE from_id = ? OR to_id = ?", id, id,
+	); err != nil {
+		return fmt.Errorf("delete node edges: %w", err)
+	}
+
+	// Cascade: remove tag associations
+	if _, err := tx.ExecContext(ctx,
+		"DELETE FROM node_tags WHERE node_id = ?", id,
+	); err != nil {
+		return fmt.Errorf("delete node tags: %w", err)
+	}
+
+	// Delete the node itself
+	if _, err := tx.ExecContext(ctx, "DELETE FROM nodes WHERE id = ?", id); err != nil {
+		return fmt.Errorf("delete node: %w", err)
+	}
+
+	if err := s.event.Append(ctx, tx, "node", id, model.ActionNodeDeleted, map[string]string{"id": id}); err != nil {
+		return fmt.Errorf("append node_deleted event: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteEdge removes an edge by ID.
+func (s *Service) DeleteEdge(ctx context.Context, tx *sql.Tx, id string) error {
+	if id == "" {
+		return fmt.Errorf("%w: id is required", model.ErrInvalidInput)
+	}
+
+	// Verify edge exists
+	if _, err := s.getEdgeTx(ctx, tx, id); err != nil {
+		return err
+	}
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM edges WHERE id = ?", id); err != nil {
+		return fmt.Errorf("delete edge: %w", err)
+	}
+
+	if err := s.event.Append(ctx, tx, "edge", id, model.ActionEdgeDeleted, map[string]string{"id": id}); err != nil {
+		return fmt.Errorf("append edge_deleted event: %w", err)
+	}
+
+	return nil
+}
+
+// SearchNodesFilter defines filters for full-text search.
+type SearchNodesFilter struct {
+	Pattern string
+	Limit   int
+	After   string
+}
+
+// SearchNodes performs FTS5 full-text search across nodes.
+func (s *Service) SearchNodes(ctx context.Context, f SearchNodesFilter) ([]model.Node, error) {
+	if f.Pattern == "" {
+		return nil, fmt.Errorf("%w: search pattern is required", model.ErrInvalidInput)
+	}
+
+	query := `SELECT n.id, n.type, n.title, n.description, n.status, n.properties, n.created_at, n.updated_at
+		FROM nodes_fts fts
+		JOIN nodes n ON n.rowid = fts.rowid
+		WHERE nodes_fts MATCH ?`
+	args := []any{f.Pattern} // sql args require any
+
+	if f.After != "" {
+		query += " AND n.id < ?"
+		args = append(args, f.After)
+	}
+
+	query += " ORDER BY rank"
+
+	limit := f.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	query += " LIMIT ?"
+	args = append(args, limit)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("search nodes: %w", err)
+	}
+	defer rows.Close()
+
+	nodes := []model.Node{}
+	for rows.Next() {
+		var n model.Node
+		var propsJSON, createdAt, updatedAt string
+		if err := rows.Scan(&n.ID, &n.Type, &n.Title, &n.Description, &n.Status, &propsJSON, &createdAt, &updatedAt); err != nil {
+			return nil, fmt.Errorf("scan search result: %w", err)
+		}
+		if err := json.Unmarshal([]byte(propsJSON), &n.Properties); err != nil {
+			return nil, fmt.Errorf("unmarshal node properties: %w", err)
+		}
+		if n.CreatedAt, err = model.ParseTime(createdAt); err != nil {
+			return nil, err
+		}
+		if n.UpdatedAt, err = model.ParseTime(updatedAt); err != nil {
+			return nil, err
+		}
+		nodes = append(nodes, n)
+	}
+
+	return nodes, rows.Err()
 }
 
 // ListNodesFilter defines filters for listing nodes.

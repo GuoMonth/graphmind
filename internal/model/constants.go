@@ -64,6 +64,9 @@ const (
 	OpCreateNode = "create_node"
 	OpCreateEdge = "create_edge"
 	OpTagNode    = "tag_node"
+	OpUpdateNode = "update_node"
+	OpDeleteNode = "delete_node"
+	OpDeleteEdge = "delete_edge"
 )
 
 // validNodeTypes is the set of allowed node types.

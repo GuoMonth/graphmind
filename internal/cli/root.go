@@ -92,6 +92,9 @@ COMMANDS
     add        Create a node                  gm add --type task --title "..."
     ln         Create an edge                 gm ln <from-id> <to-id> --type depends_on
     tag        Tag a node                     gm tag <node-id> <tag-name>
+    mv         Update a node                  gm mv <id> --status done
+    rm         Delete entities                gm rm <id> [<id>...]
+    batch      Multi-op proposal from stdin   echo '[...]' | gm batch
 
   Control (apply or discard proposals):
     commit     Apply a pending proposal       gm commit <proposal-id>
@@ -100,6 +103,8 @@ COMMANDS
   Read (query the graph):
     ls         List entities with filters     gm ls node --type task --limit 10
     cat        Show full detail by ID         gm cat <entity-id>
+    grep       Full-text search (FTS5)        gm grep "payment"
+    log        View event history             gm log --since 24h
 
   Setup:
     init       Initialize graph database      gm init
@@ -157,12 +162,17 @@ func init() {
 
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(addCmd)
+	rootCmd.AddCommand(mvCmd)
+	rootCmd.AddCommand(rmCmd)
 	rootCmd.AddCommand(lnCmd)
 	rootCmd.AddCommand(tagCmd)
 	rootCmd.AddCommand(commitCmd)
 	rootCmd.AddCommand(rejectCmd)
 	rootCmd.AddCommand(lsCmd)
 	rootCmd.AddCommand(catCmd)
+	rootCmd.AddCommand(grepCmd)
+	rootCmd.AddCommand(logCmd)
+	rootCmd.AddCommand(batchCmd)
 }
 
 // Execute runs the root command and handles exit codes.
@@ -235,8 +245,9 @@ func outputError(err error) int {
 	return exitCode
 }
 
-// truncate returns at most the first n runes of s.
-func truncate(s string, n int) string {
+// truncate returns at most the first 8 runes of s.
+func truncate(s string) string {
+	const n = 8
 	r := []rune(s)
 	if len(r) <= n {
 		return s

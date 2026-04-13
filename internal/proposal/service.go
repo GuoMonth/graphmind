@@ -169,6 +169,12 @@ func (s *Service) applyOperation(
 		return s.applyCreateEdge(ctx, tx, op.Data, createdIDs)
 	case model.OpTagNode:
 		return s.applyTagNode(ctx, tx, op.Data, createdIDs)
+	case model.OpUpdateNode:
+		return s.applyUpdateNode(ctx, tx, op.Data, createdIDs)
+	case model.OpDeleteNode:
+		return s.applyDeleteNode(ctx, tx, op.Data, createdIDs)
+	case model.OpDeleteEdge:
+		return s.applyDeleteEdge(ctx, tx, op.Data, createdIDs)
 	default:
 		return "", fmt.Errorf("%w: unknown operation action %q", model.ErrInvalidInput, op.Action)
 	}
@@ -255,6 +261,78 @@ func (s *Service) applyTagNode(
 		return "", err
 	}
 	return t.ID, nil
+}
+
+func (s *Service) applyUpdateNode(
+	ctx context.Context, tx *sql.Tx, data map[string]any, createdIDs map[int]string,
+) (string, error) {
+	id := getString(data, "id")
+	if ref, ok := getInt(data, "reference"); ok && id == "" {
+		if resolved, exists := createdIDs[ref]; exists {
+			id = resolved
+		} else {
+			return "", fmt.Errorf("%w: reference %d not yet created", model.ErrInvalidInput, ref)
+		}
+	}
+
+	input := graph.UpdateNodeInput{
+		ID:     id,
+		Type:   getString(data, "type"),
+		Title:  getString(data, "title"),
+		Status: getString(data, "status"),
+	}
+	if v, ok := data["description"]; ok {
+		if s, ok := v.(string); ok {
+			input.Description = &s
+		}
+	}
+	if props, ok := data["properties"]; ok {
+		if m, ok := props.(map[string]any); ok { // JSON properties require any
+			input.Properties = m
+		}
+	}
+
+	node, err := s.graph.UpdateNode(ctx, tx, &input)
+	if err != nil {
+		return "", err
+	}
+	return node.ID, nil
+}
+
+func (s *Service) applyDeleteNode(
+	ctx context.Context, tx *sql.Tx, data map[string]any, createdIDs map[int]string,
+) (string, error) {
+	id := getString(data, "id")
+	if ref, ok := getInt(data, "reference"); ok && id == "" {
+		if resolved, exists := createdIDs[ref]; exists {
+			id = resolved
+		} else {
+			return "", fmt.Errorf("%w: reference %d not yet created", model.ErrInvalidInput, ref)
+		}
+	}
+
+	if err := s.graph.DeleteNode(ctx, tx, id); err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
+func (s *Service) applyDeleteEdge(
+	ctx context.Context, tx *sql.Tx, data map[string]any, createdIDs map[int]string,
+) (string, error) {
+	id := getString(data, "id")
+	if ref, ok := getInt(data, "reference"); ok && id == "" {
+		if resolved, exists := createdIDs[ref]; exists {
+			id = resolved
+		} else {
+			return "", fmt.Errorf("%w: reference %d not yet created", model.ErrInvalidInput, ref)
+		}
+	}
+
+	if err := s.graph.DeleteEdge(ctx, tx, id); err != nil {
+		return "", err
+	}
+	return id, nil
 }
 
 // Get retrieves a proposal by ID.

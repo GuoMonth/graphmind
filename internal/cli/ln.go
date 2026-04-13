@@ -82,7 +82,7 @@ CYCLE DETECTION
 				"from_id": fromID,
 				"to_id":   toID,
 			},
-			Summary: fmt.Sprintf("%s: %s → %s", lnEdgeType, truncate(fromID, 8), truncate(toID, 8)),
+			Summary: fmt.Sprintf("%s: %s → %s", lnEdgeType, truncate(fromID), truncate(toID)),
 		}
 
 		p, err := svc.proposal.Create(cmd.Context(), []model.ProposalOperation{op})
