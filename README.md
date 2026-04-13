@@ -30,9 +30,9 @@ Graph (SQLite)
 
 1. Human describes what's happening
 2. AI agent asks follow-up questions
-3. AI agent queries the graph for context (`gm graph query`, `gm tag search`)
-4. AI agent creates a proposal with nodes, edges, and tags (`gm proposal create`)
-5. Human confirms, AI agent commits (`gm proposal commit`)
+3. AI agent queries the graph for context (`gm find`, `gm grep`, `gm tree`)
+4. AI agent creates a proposal with nodes, edges, and tags (`gm add`, `gm ln`, `gm batch`)
+5. Human confirms, AI agent commits (`gm commit`)
 6. Repeat as the project evolves
 
 ---
