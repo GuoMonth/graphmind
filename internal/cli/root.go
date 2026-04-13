@@ -64,7 +64,8 @@ func init() {
 }
 
 // Execute runs the root command and handles exit codes.
-func Execute() {
+func Execute(version string) {
+	rootCmd.Version = version
 	if err := rootCmd.Execute(); err != nil {
 		code := outputError(err)
 		os.Exit(code)
