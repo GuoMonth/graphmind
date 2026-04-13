@@ -8,11 +8,70 @@ GraphMind is a local-first CLI that AI agents ([Claude Code](https://docs.anthro
 
 ---
 
+## Quick Start
+
+```bash
+# Initialize a project
+gm init
+
+# Create a task (returns a pending proposal)
+gm add --type task --title "Design auth module" --description "JWT-based authentication"
+
+# Link nodes with a typed edge
+gm ln <from-id> <to-id> --type depends_on
+
+# Tag a node (creates the tag if it doesn't exist)
+gm tag <node-id> "backend"
+
+# Commit a proposal — applies all operations atomically
+gm commit <proposal-id>
+
+# List entities
+gm ls node                         # all nodes
+gm ls node --type task             # only tasks
+gm ls edge --from-id <id>          # outgoing edges
+gm ls tag                          # all tags
+
+# Show full detail of any entity
+gm cat <id>
+```
+
+All commands output JSON envelopes (`{"ok": true, "data": ...}`), making them composable in Unix pipelines.
+
+---
+
+## Core Commands
+
+| Command | Description |
+|---------|-------------|
+| `gm init` | Initialize project database |
+| `gm add` | Create a node (task, epic, story, bug, note, decision, risk) |
+| `gm ln` | Create a directed edge between two nodes |
+| `gm tag` | Associate a tag with a node (upsert) |
+| `gm commit` | Apply a pending proposal atomically |
+| `gm reject` | Discard a pending proposal |
+| `gm ls` | List entities with type/status filters and pagination |
+| `gm cat` | Show full detail of one entity by ID |
+
+### Proposal-First Writes
+
+Every write operation creates a **pending proposal** rather than modifying data directly. This gives humans (or AI agents) a chance to review before committing:
+
+```
+gm add --type task --title "Fix login bug"
+  → proposal created (pending)
+
+gm commit <proposal-id>
+  → all operations applied atomically in one SQLite transaction
+```
+
+---
+
 ## Why
 
 Traditional tools (Linear, Jira) flatten projects into forms, statuses, and boards. The simplification helps humans, but **the storage discards the real structure**.
 
-Real projects are **dynamically evolving graphs** -- multiple node types (tasks, decisions, risks), multiple relationship types (depends-on, blocks, decomposes-into), continuously changing. GraphMind preserves the full graph. AI agents handle the complexity.
+Real projects are **dynamically evolving graphs** — multiple node types (tasks, decisions, risks), multiple relationship types (depends-on, blocks, decomposes-into), continuously changing. GraphMind preserves the full graph. AI agents handle the complexity.
 
 ---
 
@@ -30,8 +89,8 @@ Graph (SQLite)
 
 1. Human describes what's happening
 2. AI agent asks follow-up questions
-3. AI agent queries the graph for context (`gm find`, `gm grep`, `gm tree`)
-4. AI agent creates a proposal with nodes, edges, and tags (`gm add`, `gm ln`, `gm batch`)
+3. AI agent queries the graph for context (`gm ls`, `gm cat`)
+4. AI agent creates a proposal with nodes, edges, and tags (`gm add`, `gm ln`, `gm tag`)
 5. Human confirms, AI agent commits (`gm commit`)
 6. Repeat as the project evolves
 
@@ -43,11 +102,11 @@ AI agents discover relationships through three complementary layers:
 
 | Layer | Mechanism | Cost | Purpose |
 |---|---|---|---|
-| **Tags** | Shared named concepts | Low | Discovery entry point -- O(N) implicit clustering |
-| **Edges** | Typed directed relationships | High | Structural analysis -- depends-on, blocks, decomposes |
+| **Tags** | Shared named concepts | Low | Discovery entry point — O(N) implicit clustering |
+| **Edges** | Typed directed relationships | High | Structural analysis — depends-on, blocks, decomposes |
 | **AI Semantic** | Content reasoning at query time | Zero | Deep association on small subgraphs |
 
-Tags are the search funnel entry point. AI agents extract 2-5 tags per node, creating implicit connections without O(N squared) explicit edges. See [Design](docs/design.md) for the full rationale.
+Tags are the search funnel entry point. AI agents extract 2–5 tags per node, creating implicit connections without O(N²) explicit edges. See [Design](docs/design.md) for the full rationale.
 
 ---
 
@@ -68,10 +127,10 @@ Tags are the search funnel entry point. AI agents extract 2-5 tags per node, cre
 
 | Document | Scope |
 |---|---|
-| [Design](docs/design.md) | Why -- core thesis, tag system, event sourcing, storage choice |
-| [Architecture](docs/architecture.md) | What -- system layers, packages, data flow |
-| [CLI Specification](docs/cli-spec.md) | API -- command contract, type registries |
-| [Conventions](docs/conventions.md) | Rules -- naming, Go, database, engineering workflow |
+| [Design](docs/design.md) | Why — core thesis, tag system, event sourcing, storage choice |
+| [Architecture](docs/architecture.md) | What — system layers, packages, data flow |
+| [CLI Specification](docs/cli-spec.md) | API — command contract, type registries |
+| [Conventions](docs/conventions.md) | Rules — naming, Go, database, engineering workflow |
 
 ---
 
@@ -80,10 +139,21 @@ Tags are the search funnel entry point. AI agents extract 2-5 tags per node, cre
 | | |
 |---|---|
 | Language | Go 1.26 |
-| Storage | SQLite (`modernc.org/sqlite`, pure Go) |
-| Primary Keys | UUID v7 |
-| Interface | CLI (JSON I/O) |
-| Quality | golangci-lint v2, git hooks |
+| Storage | SQLite (`modernc.org/sqlite`, pure Go, no CGO) |
+| Primary Keys | UUID v7 (time-ordered, RFC 9562) |
+| Interface | CLI with JSON envelope protocol |
+| CI/CD | GitHub Actions — lint, test, cross-compile release |
+| Quality | golangci-lint v2, 45+ tests, race-clean |
+
+---
+
+## Install
+
+Download a pre-built binary from [Releases](https://github.com/GuoMonth/graphmind/releases), or build from source:
+
+```bash
+go install github.com/senguoyun-guosheng/graphmind/cmd/gm@latest
+```
 
 ---
 
