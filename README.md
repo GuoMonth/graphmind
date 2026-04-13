@@ -23,17 +23,29 @@ gm ln <from-id> <to-id> --type depends_on
 # Tag a node (creates the tag if it doesn't exist)
 gm tag <node-id> "backend"
 
+# Update a node
+gm mv <node-id> --status done --title "New title"
+
 # Commit a proposal — applies all operations atomically
 gm commit <proposal-id>
 
 # List entities
 gm ls node                         # all nodes
 gm ls node --type task             # only tasks
-gm ls edge --type depends_on         # edges by type
+gm ls edge --type depends_on       # edges by type
 gm ls tag                          # all tags
+
+# Full-text search
+gm grep "payment"
 
 # Show full detail of any entity
 gm cat <id>
+
+# View event history
+gm log --since 24h
+
+# Delete a node (cascade removes edges and tag associations)
+gm rm <node-id>
 ```
 
 All commands output JSON envelopes (`{"ok": true, "data": ...}`), making them composable in Unix pipelines.
@@ -42,16 +54,38 @@ All commands output JSON envelopes (`{"ok": true, "data": ...}`), making them co
 
 ## Core Commands
 
+### Write (returns a pending proposal)
+
 | Command | Description |
 |---------|-------------|
-| `gm init` | Initialize project database |
 | `gm add` | Create a node (task, epic, decision, risk, release, discussion) |
 | `gm ln` | Create a directed edge between two nodes |
 | `gm tag` | Associate a tag with a node (upsert) |
+| `gm mv` | Update a node (title, description, status, type, properties) |
+| `gm rm` | Delete nodes or edges (cascade) |
+| `gm batch` | Multi-operation atomic proposal from JSON stdin |
+
+### Control (apply or discard proposals)
+
+| Command | Description |
+|---------|-------------|
 | `gm commit` | Apply a pending proposal atomically |
 | `gm reject` | Discard a pending proposal |
+
+### Read (query the graph)
+
+| Command | Description |
+|---------|-------------|
 | `gm ls` | List entities with type/status filters and pagination |
 | `gm cat` | Show full detail of one entity by ID |
+| `gm grep` | Full-text search nodes via FTS5 |
+| `gm log` | View event history with time/entity filters |
+
+### Setup
+
+| Command | Description |
+|---------|-------------|
+| `gm init` | Initialize project database |
 
 ### Proposal-First Writes
 

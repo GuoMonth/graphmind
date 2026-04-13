@@ -88,9 +88,13 @@ OUTPUT
 		// If stdin has data, use it (merged with id)
 		stat, err := os.Stdin.Stat()
 		if err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
-			input, err := io.ReadAll(os.Stdin)
+			const maxStdinBytes = 10 << 20 // 10 MB
+			input, err := io.ReadAll(io.LimitReader(os.Stdin, maxStdinBytes+1))
 			if err != nil {
 				return fmt.Errorf("%w: read stdin: %s", model.ErrInvalidInput, err)
+			}
+			if len(input) > maxStdinBytes {
+				return fmt.Errorf("%w: stdin exceeds 10 MB limit", model.ErrInvalidInput)
 			}
 			if len(input) > 0 {
 				var stdinData map[string]any // JSON input is untyped

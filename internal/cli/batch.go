@@ -34,6 +34,8 @@ CROSS-REFERENCES
   - "to_reference": <index>     (for ln command, instead of to_id)
   - "reference": <index>        (for tag/mv/rm, instead of node_id/id)
 
+  For "rm", set "entity": "edge" to delete an edge (default: "node").
+
 EXAMPLES
 
   # Create two nodes and link them in one atomic proposal:
@@ -61,9 +63,13 @@ OUTPUT
   Error — invalid command:
   {"ok":false,"error":{"code":"INVALID_INPUT","message":"invalid input: unknown batch command \"foo\""}}`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		input, err := io.ReadAll(os.Stdin)
+		const maxStdinBytes = 10 << 20 // 10 MB
+		input, err := io.ReadAll(io.LimitReader(os.Stdin, maxStdinBytes+1))
 		if err != nil {
 			return fmt.Errorf("%w: read stdin: %s", model.ErrInvalidInput, err)
+		}
+		if len(input) > maxStdinBytes {
+			return fmt.Errorf("%w: stdin exceeds 10 MB limit", model.ErrInvalidInput)
 		}
 		if len(input) == 0 {
 			return fmt.Errorf("%w: stdin is empty, expected JSON array", model.ErrInvalidInput)
@@ -146,13 +152,29 @@ func batchCommandToOp(command string, data map[string]any, index int) (model.Pro
 
 	case "rm":
 		id, _ := data["id"].(string)
-		// Default to delete_node; actual type resolved at commit time
-		return model.ProposalOperation{
-			Action:  model.OpDeleteNode,
-			Entity:  "node",
-			Data:    data,
-			Summary: fmt.Sprintf("delete: %s", truncate(id)),
-		}, nil
+		// Require explicit entity type, or default to node
+		entity, _ := data["entity"].(string)
+		switch entity {
+		case "edge":
+			return model.ProposalOperation{
+				Action:  model.OpDeleteEdge,
+				Entity:  "edge",
+				Data:    data,
+				Summary: fmt.Sprintf("delete edge: %s", truncate(id)),
+			}, nil
+		case "node", "":
+			return model.ProposalOperation{
+				Action:  model.OpDeleteNode,
+				Entity:  "node",
+				Data:    data,
+				Summary: fmt.Sprintf("delete node: %s", truncate(id)),
+			}, nil
+		default:
+			return model.ProposalOperation{}, fmt.Errorf(
+				"%w: rm entity must be \"node\" or \"edge\", got %q at index %d",
+				model.ErrInvalidInput, entity, index,
+			)
+		}
 
 	default:
 		return model.ProposalOperation{}, fmt.Errorf(

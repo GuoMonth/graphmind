@@ -51,6 +51,7 @@ OUTPUT
 		ids := args
 
 		// Read IDs from stdin pipe if available
+		const maxBatchIDs = 10000
 		stat, err := os.Stdin.Stat()
 		if err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
 			scanner := bufio.NewScanner(os.Stdin)
@@ -65,6 +66,9 @@ OUTPUT
 				}
 				if id, ok := obj["id"].(string); ok && id != "" {
 					ids = append(ids, id)
+				}
+				if len(ids) > maxBatchIDs {
+					return fmt.Errorf("%w: too many IDs (max %d)", model.ErrInvalidInput, maxBatchIDs)
 				}
 			}
 			if err := scanner.Err(); err != nil {

@@ -842,6 +842,49 @@ func TestDeleteNodeCascadeEdges(t *testing.T) {
 	}
 }
 
+func TestDeleteNodeCascadeTags(t *testing.T) {
+	env := setup(t)
+	n := env.createNode(t, "task", "Tagged node")
+
+	// Insert a tag and node_tags association directly
+	tx := env.beginTx(t)
+	tx.ExecContext(env.ctx,
+		"INSERT INTO tags (id, name, created_at, updated_at) VALUES ('tag1', 'backend', datetime('now'), datetime('now'))")
+	tx.ExecContext(env.ctx,
+		"INSERT INTO node_tags (node_id, tag_id) VALUES (?, 'tag1')", n.ID)
+	tx.Commit()
+
+	// Verify tag association exists
+	var count int
+	env.db.QueryRowContext(env.ctx,
+		"SELECT COUNT(*) FROM node_tags WHERE node_id = ?", n.ID).Scan(&count)
+	if count != 1 {
+		t.Fatalf("node_tags before delete = %d, want 1", count)
+	}
+
+	// Delete node — should cascade to node_tags
+	tx = env.beginTx(t)
+	if err := env.graph.DeleteNode(env.ctx, tx, n.ID); err != nil {
+		tx.Rollback()
+		t.Fatalf("DeleteNode: %v", err)
+	}
+	tx.Commit()
+
+	// Tag association should be gone, but the tag itself remains
+	env.db.QueryRowContext(env.ctx,
+		"SELECT COUNT(*) FROM node_tags WHERE node_id = ?", n.ID).Scan(&count)
+	if count != 0 {
+		t.Errorf("node_tags after cascade delete = %d, want 0", count)
+	}
+
+	var tagCount int
+	env.db.QueryRowContext(env.ctx,
+		"SELECT COUNT(*) FROM tags WHERE id = 'tag1'").Scan(&tagCount)
+	if tagCount != 1 {
+		t.Errorf("tag should remain after node delete, got count=%d", tagCount)
+	}
+}
+
 func TestDeleteNodeNotFound(t *testing.T) {
 	env := setup(t)
 	tx := env.beginTx(t)
