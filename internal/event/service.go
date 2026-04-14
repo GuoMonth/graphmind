@@ -48,12 +48,13 @@ type ListFilter struct {
 	EntityType string
 	EntityID   string
 	Action     string
+	Since      string // ISO 8601 timestamp or Go duration string
 	Limit      int
 	After      string
 }
 
 // List returns events matching the given filters.
-func (s *Service) List(ctx context.Context, f ListFilter) ([]model.Event, error) {
+func (s *Service) List(ctx context.Context, f *ListFilter) ([]model.Event, error) {
 	query := "SELECT id, entity_type, entity_id, action, payload, created_at FROM events WHERE 1=1"
 	var args []any // sql scanning requires any
 
@@ -70,8 +71,13 @@ func (s *Service) List(ctx context.Context, f ListFilter) ([]model.Event, error)
 		args = append(args, f.Action)
 	}
 	if f.After != "" {
+		// Cursor pagination: UUIDv7 IDs are time-ordered (RFC 9562).
 		query += " AND id < ?"
 		args = append(args, f.After)
+	}
+	if f.Since != "" {
+		query += " AND created_at >= ?"
+		args = append(args, f.Since)
 	}
 
 	query += " ORDER BY created_at DESC"

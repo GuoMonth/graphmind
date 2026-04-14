@@ -105,7 +105,15 @@ PAGINATION
 			if err != nil {
 				return err
 			}
-			output(nodes)
+			summary := fmt.Sprintf("Listed %d %s.", len(nodes), pluralize("node", "nodes", len(nodes)))
+			next := []string{
+				"gm cat <id>  — inspect a specific node",
+				"gm grep <keyword>  — search nodes by keyword",
+			}
+			if len(nodes) == lsLimit {
+				next = append(next, fmt.Sprintf("gm ls node --limit %d --after %s  — next page", lsLimit, nodes[len(nodes)-1].ID))
+			}
+			outputSuccess(nodes, summary, next)
 
 		case "edge":
 			edges, err := svc.graph.ListEdges(ctx, graph.ListEdgesFilter{
@@ -116,7 +124,12 @@ PAGINATION
 			if err != nil {
 				return err
 			}
-			output(edges)
+			summary := fmt.Sprintf("Listed %d %s.", len(edges), pluralize("edge", "edges", len(edges)))
+			next := []string{"gm cat <id>  — inspect a specific edge"}
+			if len(edges) == lsLimit {
+				next = append(next, fmt.Sprintf("gm ls edge --limit %d --after %s  — next page", lsLimit, edges[len(edges)-1].ID))
+			}
+			outputSuccess(edges, summary, next)
 
 		case "tag":
 			tags, err := svc.tag.ListTags(ctx, tag.ListTagsFilter{
@@ -126,7 +139,12 @@ PAGINATION
 			if err != nil {
 				return err
 			}
-			output(tags)
+			summary := fmt.Sprintf("Listed %d %s.", len(tags), pluralize("tag", "tags", len(tags)))
+			next := []string{"gm cat <id>  — inspect a specific tag"}
+			if len(tags) == lsLimit {
+				next = append(next, fmt.Sprintf("gm ls tag --limit %d --after %s  — next page", lsLimit, tags[len(tags)-1].Name))
+			}
+			outputSuccess(tags, summary, next)
 
 		case "proposal":
 			proposals, err := svc.proposal.List(ctx, proposal.ListFilter{
@@ -137,7 +155,17 @@ PAGINATION
 			if err != nil {
 				return err
 			}
-			output(proposals)
+			summary := fmt.Sprintf("Listed %d %s.", len(proposals), pluralize("proposal", "proposals", len(proposals)))
+			next := []string{
+				"gm commit <id>  — apply a pending proposal",
+				"gm cat <id>  — inspect a specific proposal",
+			}
+			if len(proposals) == lsLimit {
+				next = append(next,
+					fmt.Sprintf("gm ls proposal --limit %d --after %s  — next page",
+						lsLimit, proposals[len(proposals)-1].ID))
+			}
+			outputSuccess(proposals, summary, next)
 
 		default:
 			return fmt.Errorf("%w: unknown entity type: %s (expected: node, edge, tag, proposal)",

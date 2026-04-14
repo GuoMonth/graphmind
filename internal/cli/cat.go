@@ -77,7 +77,16 @@ Use this to inspect any entity after listing with "gm ls".`,
 		// Only fall through on ErrNotFound; surface all other errors.
 		node, err := svc.graph.GetNode(ctx, id)
 		if err == nil {
-			output(node)
+			outputSuccess(node,
+				fmt.Sprintf("Retrieved %s node %q (id: %s).", node.Type, node.Title, truncate(node.ID)),
+				[]string{
+					fmt.Sprintf("gm mv %s --status <new>  — update this node", id),
+					fmt.Sprintf("gm ln %s <other-id> --type <type>  — link to another node", id),
+					fmt.Sprintf("gm tag %s <tag-name>  — attach a tag", id),
+					fmt.Sprintf("gm rm %s  — delete this node", id),
+					fmt.Sprintf("gm log --entity-id %s  — view this node's event history", id),
+				},
+			)
 			return nil
 		}
 		if !errors.Is(err, model.ErrNotFound) {
@@ -86,7 +95,15 @@ Use this to inspect any entity after listing with "gm ls".`,
 
 		edge, err := svc.graph.GetEdge(ctx, id)
 		if err == nil {
-			output(edge)
+			outputSuccess(edge,
+				fmt.Sprintf("Retrieved %s edge (id: %s, from: %s → to: %s).",
+					edge.Type, truncate(edge.ID), truncate(edge.FromID), truncate(edge.ToID)),
+				[]string{
+					fmt.Sprintf("gm cat %s  — inspect the source node", edge.FromID),
+					fmt.Sprintf("gm cat %s  — inspect the target node", edge.ToID),
+					fmt.Sprintf("gm rm %s  — delete this edge", id),
+				},
+			)
 			return nil
 		}
 		if !errors.Is(err, model.ErrNotFound) {
@@ -95,7 +112,13 @@ Use this to inspect any entity after listing with "gm ls".`,
 
 		t, err := svc.tag.GetTag(ctx, id)
 		if err == nil {
-			output(t)
+			outputSuccess(t,
+				fmt.Sprintf("Retrieved tag %q (id: %s).", t.Name, truncate(t.ID)),
+				[]string{
+					"gm ls node  — list nodes (filter by tag coming soon)",
+					fmt.Sprintf("gm log --entity-id %s  — view tag event history", id),
+				},
+			)
 			return nil
 		}
 		if !errors.Is(err, model.ErrNotFound) {
@@ -104,13 +127,30 @@ Use this to inspect any entity after listing with "gm ls".`,
 
 		p, err := svc.proposal.Get(ctx, id)
 		if err == nil {
-			output(p)
+			next := []string{
+				fmt.Sprintf("gm log --entity-id %s  — view proposal events", id),
+			}
+			if p.Status == "pending" {
+				next = append([]string{
+					fmt.Sprintf("gm commit %s  — apply this proposal", id),
+					fmt.Sprintf("gm reject %s  — discard this proposal", id),
+				}, next...)
+			}
+			outputSuccess(p,
+				fmt.Sprintf("Retrieved %s proposal %s with %d %s.",
+					p.Status, truncate(p.ID), len(p.Operations),
+					pluralize("operation", "operations", len(p.Operations))),
+				next,
+			)
 			return nil
 		}
 		if !errors.Is(err, model.ErrNotFound) {
 			return err
 		}
 
-		return fmt.Errorf("%w: no entity with id %s", model.ErrNotFound, id)
+		return model.WithHint(
+			fmt.Errorf("%w: no entity with id %s", model.ErrNotFound, id),
+			"Use 'gm ls node', 'gm ls edge', 'gm ls tag', or 'gm ls proposal' to find valid IDs.",
+		)
 	},
 }

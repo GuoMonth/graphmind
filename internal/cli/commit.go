@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -47,7 +49,15 @@ Only proposals with status "pending" can be committed.`,
 			return err
 		}
 
-		output(p)
+		outputSuccess(p,
+			fmt.Sprintf("Committed proposal %s: %d %s applied atomically.",
+				truncate(p.ID), len(p.Operations), pluralize("operation", "operations", len(p.Operations))),
+			[]string{
+				"gm ls node  — list nodes to see the changes",
+				"gm log --since 1h  — view recent event history",
+				fmt.Sprintf("gm cat %s  — review the committed proposal", p.ID),
+			},
+		)
 		return nil
 	},
 }
@@ -84,7 +94,14 @@ Only proposals with status "pending" can be rejected.`,
 			return err
 		}
 
-		output(p)
+		outputSuccess(p,
+			fmt.Sprintf("Rejected proposal %s: all %d %s discarded.",
+				truncate(p.ID), len(p.Operations), pluralize("operation", "operations", len(p.Operations))),
+			[]string{
+				"gm ls proposal --status pending  — check remaining pending proposals",
+				"gm add / gm ln / gm tag / gm batch  — create new proposals",
+			},
+		)
 		return nil
 	},
 }

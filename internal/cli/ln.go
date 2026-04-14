@@ -71,7 +71,10 @@ CYCLE DETECTION
 		toID := args[1]
 
 		if !model.IsValidEdgeType(lnEdgeType) {
-			return fmt.Errorf("%w: invalid edge type %q", model.ErrInvalidInput, lnEdgeType)
+			return model.WithHint(
+				fmt.Errorf("%w: invalid edge type %q", model.ErrInvalidInput, lnEdgeType),
+				fmt.Sprintf("Valid edge types: %v. Example: gm ln <from> <to> --type depends_on", model.AllEdgeTypes()),
+			)
 		}
 
 		op := model.ProposalOperation{
@@ -82,7 +85,7 @@ CYCLE DETECTION
 				"from_id": fromID,
 				"to_id":   toID,
 			},
-			Summary: fmt.Sprintf("%s: %s → %s", lnEdgeType, truncate(fromID, 8), truncate(toID, 8)),
+			Summary: fmt.Sprintf("%s: %s → %s", lnEdgeType, truncate(fromID), truncate(toID)),
 		}
 
 		p, err := svc.proposal.Create(cmd.Context(), []model.ProposalOperation{op})
@@ -90,7 +93,11 @@ CYCLE DETECTION
 			return err
 		}
 
-		output(p)
+		outputSuccess(p,
+			fmt.Sprintf("Created pending proposal %s: create %s edge (%s → %s).",
+				truncate(p.ID), lnEdgeType, truncate(fromID), truncate(toID)),
+			proposalNextSteps(p.ID),
+		)
 		return nil
 	},
 }

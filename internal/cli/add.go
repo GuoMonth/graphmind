@@ -92,7 +92,10 @@ STDIN FORMAT
 
 		nodeType, _ := data["type"].(string)
 		if !model.IsValidNodeType(nodeType) {
-			return fmt.Errorf("%w: invalid node type %q", model.ErrInvalidInput, nodeType)
+			return model.WithHint(
+				fmt.Errorf("%w: invalid node type %q", model.ErrInvalidInput, nodeType),
+				fmt.Sprintf("Valid node types: %v. Example: gm add --type task --title \"...\"", model.AllNodeTypes()),
+			)
 		}
 
 		title, _ := data["title"].(string)
@@ -108,7 +111,10 @@ STDIN FORMAT
 			return err
 		}
 
-		output(p)
+		outputSuccess(p,
+			fmt.Sprintf("Created pending proposal %s: create %s node %q.", truncate(p.ID), nodeType, title),
+			proposalNextSteps(p.ID),
+		)
 		return nil
 	},
 }

@@ -60,7 +60,7 @@ is committed. If it already exists, the existing tag is reused.`,
 				"tag_name":    tagName,
 				"description": tagDescription,
 			},
-			Summary: fmt.Sprintf("tag %s with %q", truncate(nodeID, 8), tagName),
+			Summary: fmt.Sprintf("tag %s with %q", truncate(nodeID), tagName),
 		}
 
 		p, err := svc.proposal.Create(cmd.Context(), []model.ProposalOperation{op})
@@ -68,7 +68,11 @@ is committed. If it already exists, the existing tag is reused.`,
 			return err
 		}
 
-		output(p)
+		outputSuccess(p,
+			fmt.Sprintf("Created pending proposal %s: tag node %s with %q.",
+				truncate(p.ID), truncate(nodeID), tagName),
+			proposalNextSteps(p.ID),
+		)
 		return nil
 	},
 }

@@ -64,8 +64,8 @@ CORE CONCEPTS
   Output Format
     Every command writes exactly one JSON object to stdout:
 
-      Success:  {"ok":true,"data":<payload>}
-      Error:    {"ok":false,"error":{"code":"<CODE>","message":"<detail>"}}
+      Success:  {"ok":true,"data":<payload>,"summary":"...","next_steps":["..."]}
+      Error:    {"ok":false,"error":{"code":"<CODE>","message":"<detail>","hint":"<AI guidance>"}}
 
     Use --pretty for human-readable indented output.
     Use --quiet to suppress stdout entirely (exit code only).
@@ -92,6 +92,9 @@ COMMANDS
     add        Create a node                  gm add --type task --title "..."
     ln         Create an edge                 gm ln <from-id> <to-id> --type depends_on
     tag        Tag a node                     gm tag <node-id> <tag-name>
+    mv         Update a node                  gm mv <id> --status done
+    rm         Delete entities                gm rm <id> [<id>...]
+    batch      Multi-op proposal from stdin   echo '[...]' | gm batch
 
   Control (apply or discard proposals):
     commit     Apply a pending proposal       gm commit <proposal-id>
@@ -100,6 +103,8 @@ COMMANDS
   Read (query the graph):
     ls         List entities with filters     gm ls node --type task --limit 10
     cat        Show full detail by ID         gm cat <entity-id>
+    grep       Full-text search (FTS5)        gm grep "payment"
+    log        View event history             gm log --since 24h
 
   Setup:
     init       Initialize graph database      gm init
@@ -157,12 +162,17 @@ func init() {
 
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(addCmd)
+	rootCmd.AddCommand(mvCmd)
+	rootCmd.AddCommand(rmCmd)
 	rootCmd.AddCommand(lnCmd)
 	rootCmd.AddCommand(tagCmd)
 	rootCmd.AddCommand(commitCmd)
 	rootCmd.AddCommand(rejectCmd)
 	rootCmd.AddCommand(lsCmd)
 	rootCmd.AddCommand(catCmd)
+	rootCmd.AddCommand(grepCmd)
+	rootCmd.AddCommand(logCmd)
+	rootCmd.AddCommand(batchCmd)
 }
 
 // Execute runs the root command and handles exit codes.
@@ -198,13 +208,27 @@ func wireAndMigrate(ctx context.Context) error {
 	return db.Migrate(ctx, svc.db)
 }
 
-// output writes the JSON envelope to stdout.
-func output(data any) {
+// outputSuccess writes a JSON success envelope with summary and next-step guidance.
+func outputSuccess(data any, summary string, nextSteps []string) {
 	if quiet {
 		return
 	}
-	env := model.Envelope{OK: true, Data: data}
+	env := model.Envelope{
+		OK:        true,
+		Data:      data,
+		Summary:   summary,
+		NextSteps: nextSteps,
+	}
 	writeJSON(env)
+}
+
+// proposalNextSteps returns common next-step suggestions for write commands that produce proposals.
+func proposalNextSteps(proposalID string) []string {
+	return []string{
+		fmt.Sprintf("gm commit %s  — apply the changes to the graph", proposalID),
+		fmt.Sprintf("gm cat %s  — inspect proposal details before committing", proposalID),
+		fmt.Sprintf("gm reject %s  — discard this proposal", proposalID),
+	}
 }
 
 // outputError writes a JSON error envelope to stdout and returns the appropriate exit code.
@@ -226,8 +250,12 @@ func outputError(err error) int {
 
 	if !quiet {
 		env := model.Envelope{
-			OK:    false,
-			Error: &model.ErrorBody{Code: code, Message: err.Error()},
+			OK: false,
+			Error: &model.ErrorBody{
+				Code:    code,
+				Message: err.Error(),
+				Hint:    model.GetHint(err),
+			},
 		}
 		writeJSON(env)
 	}
@@ -235,13 +263,22 @@ func outputError(err error) int {
 	return exitCode
 }
 
-// truncate returns at most the first n runes of s.
-func truncate(s string, n int) string {
+// truncate returns at most the first 8 runes of s.
+func truncate(s string) string {
+	const n = 8
 	r := []rune(s)
 	if len(r) <= n {
 		return s
 	}
 	return string(r[:n])
+}
+
+// pluralize returns singular when n == 1, plural otherwise.
+func pluralize(singular, plural string, n int) string {
+	if n == 1 {
+		return singular
+	}
+	return plural
 }
 
 func writeJSON(v any) {

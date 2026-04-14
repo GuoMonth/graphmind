@@ -33,6 +33,13 @@ func (s *Service) Create(ctx context.Context, operations []model.ProposalOperati
 	if len(operations) == 0 {
 		return nil, fmt.Errorf("%w: proposal must have at least one operation", model.ErrInvalidInput)
 	}
+	const maxOperations = 1000
+	if len(operations) > maxOperations {
+		return nil, model.WithHint(
+			fmt.Errorf("%w: proposal has %d operations, max %d", model.ErrInvalidInput, len(operations), maxOperations),
+			"Split into multiple proposals with up to 1000 operations each, then commit them sequentially.",
+		)
+	}
 
 	id, err := uuid.NewV7()
 	if err != nil {
@@ -86,7 +93,10 @@ func (s *Service) Commit(ctx context.Context, proposalID string) (*model.Proposa
 		return nil, err
 	}
 	if p.Status != model.ProposalStatusPending {
-		return nil, fmt.Errorf("%w: proposal is %s, not pending", model.ErrInvalidState, p.Status)
+		return nil, model.WithHint(
+			fmt.Errorf("%w: proposal is %s, not pending", model.ErrInvalidState, p.Status),
+			"Only pending proposals can be committed. Create a new proposal with 'gm add/ln/tag/mv/rm/batch'.",
+		)
 	}
 
 	// Track created entity IDs for internal references
@@ -136,7 +146,10 @@ func (s *Service) Reject(ctx context.Context, proposalID string) (*model.Proposa
 		return nil, err
 	}
 	if p.Status != model.ProposalStatusPending {
-		return nil, fmt.Errorf("%w: proposal is %s, not pending", model.ErrInvalidState, p.Status)
+		return nil, model.WithHint(
+			fmt.Errorf("%w: proposal is %s, not pending", model.ErrInvalidState, p.Status),
+			"Only pending proposals can be rejected. This proposal has already been processed.",
+		)
 	}
 
 	now := time.Now().UTC().Format(model.TimeFormat)
@@ -169,6 +182,12 @@ func (s *Service) applyOperation(
 		return s.applyCreateEdge(ctx, tx, op.Data, createdIDs)
 	case model.OpTagNode:
 		return s.applyTagNode(ctx, tx, op.Data, createdIDs)
+	case model.OpUpdateNode:
+		return s.applyUpdateNode(ctx, tx, op.Data, createdIDs)
+	case model.OpDeleteNode:
+		return s.applyDeleteNode(ctx, tx, op.Data, createdIDs)
+	case model.OpDeleteEdge:
+		return s.applyDeleteEdge(ctx, tx, op.Data, createdIDs)
 	default:
 		return "", fmt.Errorf("%w: unknown operation action %q", model.ErrInvalidInput, op.Action)
 	}
@@ -257,6 +276,78 @@ func (s *Service) applyTagNode(
 	return t.ID, nil
 }
 
+func (s *Service) applyUpdateNode(
+	ctx context.Context, tx *sql.Tx, data map[string]any, createdIDs map[int]string,
+) (string, error) {
+	id := getString(data, "id")
+	if ref, ok := getInt(data, "reference"); ok && id == "" {
+		if resolved, exists := createdIDs[ref]; exists {
+			id = resolved
+		} else {
+			return "", fmt.Errorf("%w: reference %d not yet created", model.ErrInvalidInput, ref)
+		}
+	}
+
+	input := graph.UpdateNodeInput{
+		ID:     id,
+		Type:   getString(data, "type"),
+		Title:  getString(data, "title"),
+		Status: getString(data, "status"),
+	}
+	if v, ok := data["description"]; ok {
+		if s, ok := v.(string); ok {
+			input.Description = &s
+		}
+	}
+	if props, ok := data["properties"]; ok {
+		if m, ok := props.(map[string]any); ok { // JSON properties require any
+			input.Properties = m
+		}
+	}
+
+	node, err := s.graph.UpdateNode(ctx, tx, &input)
+	if err != nil {
+		return "", err
+	}
+	return node.ID, nil
+}
+
+func (s *Service) applyDeleteNode(
+	ctx context.Context, tx *sql.Tx, data map[string]any, createdIDs map[int]string,
+) (string, error) {
+	id := getString(data, "id")
+	if ref, ok := getInt(data, "reference"); ok && id == "" {
+		if resolved, exists := createdIDs[ref]; exists {
+			id = resolved
+		} else {
+			return "", fmt.Errorf("%w: reference %d not yet created", model.ErrInvalidInput, ref)
+		}
+	}
+
+	if err := s.graph.DeleteNode(ctx, tx, id); err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
+func (s *Service) applyDeleteEdge(
+	ctx context.Context, tx *sql.Tx, data map[string]any, createdIDs map[int]string,
+) (string, error) {
+	id := getString(data, "id")
+	if ref, ok := getInt(data, "reference"); ok && id == "" {
+		if resolved, exists := createdIDs[ref]; exists {
+			id = resolved
+		} else {
+			return "", fmt.Errorf("%w: reference %d not yet created", model.ErrInvalidInput, ref)
+		}
+	}
+
+	if err := s.graph.DeleteEdge(ctx, tx, id); err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
 // Get retrieves a proposal by ID.
 func (s *Service) Get(ctx context.Context, id string) (*model.Proposal, error) {
 	return s.scanProposal(s.db.QueryRowContext(ctx,
@@ -277,7 +368,10 @@ func (s *Service) scanProposal(row *sql.Row) (*model.Proposal, error) {
 
 	err := row.Scan(&p.ID, &p.Status, &opsJSON, &createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("%w: proposal", model.ErrNotFound)
+		return nil, model.WithHint(
+			fmt.Errorf("%w: proposal", model.ErrNotFound),
+			"Use 'gm ls proposal' to list proposals, or check the ID from a previous 'gm add/ln/tag/mv/rm/batch' output.",
+		)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scan proposal: %w", err)

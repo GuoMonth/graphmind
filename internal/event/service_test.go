@@ -56,7 +56,7 @@ func TestAppendAndList(t *testing.T) {
 	}
 
 	// List all events
-	events, err := svc2.List(ctx, event.ListFilter{Limit: 100})
+	events, err := svc2.List(ctx, &event.ListFilter{Limit: 100})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -65,7 +65,7 @@ func TestAppendAndList(t *testing.T) {
 	}
 
 	// Filter by entity_type
-	nodeEvents, err := svc2.List(ctx, event.ListFilter{EntityType: "node"})
+	nodeEvents, err := svc2.List(ctx, &event.ListFilter{EntityType: "node"})
 	if err != nil {
 		t.Fatalf("List(EntityType=node): %v", err)
 	}
@@ -74,7 +74,7 @@ func TestAppendAndList(t *testing.T) {
 	}
 
 	// Filter by entity_id
-	n1Events, err := svc2.List(ctx, event.ListFilter{EntityID: "n1"})
+	n1Events, err := svc2.List(ctx, &event.ListFilter{EntityID: "n1"})
 	if err != nil {
 		t.Fatalf("List(EntityID=n1): %v", err)
 	}
@@ -83,7 +83,7 @@ func TestAppendAndList(t *testing.T) {
 	}
 
 	// Filter by action
-	createdEvents, err := svc2.List(ctx, event.ListFilter{Action: "node_created"})
+	createdEvents, err := svc2.List(ctx, &event.ListFilter{Action: "node_created"})
 	if err != nil {
 		t.Fatalf("List(Action=node_created): %v", err)
 	}
@@ -103,7 +103,7 @@ func TestListEmpty(t *testing.T) {
 	db.Migrate(ctx, d)
 	svc := event.NewService(d)
 
-	events, err := svc.List(ctx, event.ListFilter{})
+	events, err := svc.List(ctx, &event.ListFilter{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestListDefaultLimit(t *testing.T) {
 	}
 	tx.Commit()
 
-	events, err := svc.List(ctx, event.ListFilter{})
+	events, err := svc.List(ctx, &event.ListFilter{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}

@@ -4,15 +4,18 @@ import "slices"
 
 // Envelope is the standard JSON output wrapper.
 type Envelope struct {
-	OK    bool       `json:"ok"`
-	Data  any        `json:"data,omitempty"`  // present on success
-	Error *ErrorBody `json:"error,omitempty"` // present on failure
+	OK        bool       `json:"ok"`
+	Data      any        `json:"data,omitempty"`       // present on success
+	Summary   string     `json:"summary,omitempty"`    // what was accomplished (success only)
+	NextSteps []string   `json:"next_steps,omitempty"` // suggested follow-up actions
+	Error     *ErrorBody `json:"error,omitempty"`      // present on failure
 }
 
 // ErrorBody is the structured error in the envelope.
 type ErrorBody struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+	Hint    string `json:"hint,omitempty"`
 }
 
 // Node types
@@ -64,6 +67,9 @@ const (
 	OpCreateNode = "create_node"
 	OpCreateEdge = "create_edge"
 	OpTagNode    = "tag_node"
+	OpUpdateNode = "update_node"
+	OpDeleteNode = "delete_node"
+	OpDeleteEdge = "delete_edge"
 )
 
 // validNodeTypes is the set of allowed node types.
