@@ -121,10 +121,9 @@ Runs at two points:
 2. **Proposal commit** -- re-validate all operations against current graph state
 
 Checks performed:
-- **Cycle detection** -- recursive CTE with visited-node tracking
-- **Referential integrity** -- edges reference existing nodes
-- **Type constraints** -- node/edge types from registered set
-- **Duplicate edge** -- no two edges of same type between same node pair
+- **Cycle detection** — recursive CTE with visited-node tracking
+- **Referential integrity** — edges reference existing nodes
+- **Duplicate edge** — no two edges of same type between same node pair
 
 ---
 

@@ -1,42 +1,43 @@
 # GraphMind
 
-**Graph-based project management, built natively for AI agents.**
+**Graph-based memory storage, built natively for AI agents.**
 
-GraphMind is a local-first CLI that AI agents ([Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex](https://openai.com/index/codex/), [Copilot](https://github.com/features/copilot)) use to read and write a project graph stored in SQLite. Humans talk to the AI agent. The AI agent calls `gm`.
+GraphMind is a local-first CLI that AI agents ([Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex](https://openai.com/index/codex/), [Copilot](https://github.com/features/copilot)) use to record and retrieve human memories as a graph stored in SQLite. Humans describe what happened. The AI agent captures who, when, where — and builds the connections.
 
-> _"I just describe what's happening, and the system figures out what I need to do."_
+> _"I just describe what happened, and the system remembers it — with all the people, places, and connections."_
 
 ---
 
 ## Quick Start
 
 ```bash
-# Initialize a project
+# Initialize the memory graph
 gm init
 
-# Create a task (returns a pending proposal)
-gm add --type task --title "Design auth module" --description "JWT-based authentication"
+# Record a memory (returns a pending proposal)
+gm add --type event --title "Had dinner with David" \
+       --who "David, Lisa" --where "Bangkok Kitchen" --event-time "2026-04-12"
 
-# Link nodes with a typed edge
-gm ln <from-id> <to-id> --type depends_on
+# Link memories with a typed edge
+gm ln <from-id> <to-id> --type followed_by
 
-# Tag a node (creates the tag if it doesn't exist)
-gm tag <node-id> "backend"
+# Tag a memory (creates the tag if it doesn't exist)
+gm tag <node-id> "thailand-trip"
 
-# Update a node
-gm mv <node-id> --status done --title "New title"
+# Update a memory with new details
+gm mv <node-id> --who "David, Lisa, James" --event-time "last Friday evening"
 
 # Commit a proposal — applies all operations atomically
 gm commit <proposal-id>
 
-# List entities
-gm ls node                         # all nodes
-gm ls node --type task             # only tasks
-gm ls edge --type depends_on       # edges by type
+# List memories
+gm ls node                         # all memories
+gm ls node --type event            # only events
+gm ls edge --type caused_by        # causal edges
 gm ls tag                          # all tags
 
 # Full-text search
-gm grep "payment"
+gm grep "dinner"
 
 # Show full detail of any entity
 gm cat <id>
@@ -44,7 +45,7 @@ gm cat <id>
 # View event history
 gm log --since 24h
 
-# Delete a node (cascade removes edges and tag associations)
+# Delete a memory (cascade removes edges and tag associations)
 gm rm <node-id>
 ```
 
@@ -58,10 +59,10 @@ All commands output JSON envelopes (`{"ok": true, "data": ...}`), making them co
 
 | Command | Description |
 |---------|-------------|
-| `gm add` | Create a node (task, epic, decision, risk, release, discussion) |
+| `gm add` | Create a memory node — type, title, who, where, event_time |
 | `gm ln` | Create a directed edge between two nodes |
 | `gm tag` | Associate a tag with a node (upsert) |
-| `gm mv` | Update a node (title, description, status, type, properties) |
+| `gm mv` | Update a node (title, who, where, event_time, status, properties) |
 | `gm rm` | Delete nodes or edges (cascade) |
 | `gm batch` | Multi-operation atomic proposal from JSON stdin |
 
@@ -85,14 +86,14 @@ All commands output JSON envelopes (`{"ok": true, "data": ...}`), making them co
 
 | Command | Description |
 |---------|-------------|
-| `gm init` | Initialize project database |
+| `gm init` | Initialize memory graph database |
 
 ### Proposal-First Writes
 
 Every write operation creates a **pending proposal** rather than modifying data directly. This gives humans (or AI agents) a chance to review before committing:
 
 ```
-gm add --type task --title "Fix login bug"
+gm add --type event --title "Met David at conference" --who "David" --where "Tech Summit"
   → proposal created (pending)
 
 gm commit <proposal-id>
@@ -101,11 +102,39 @@ gm commit <proposal-id>
 
 ---
 
+## Core Concepts
+
+### Memory Nodes
+
+Every record is a **memory** — something that happened, was observed, decided, or thought. Memories have dedicated fields for the essential context:
+
+| Field | Purpose | Example |
+|---|---|---|
+| `type` | Open string — AI decides | `event`, `person`, `place`, `thought` |
+| `title` | Brief summary | "Had dinner with David" |
+| `who` | People involved | "David, Lisa" |
+| `where` | Location | "Bangkok Kitchen, 3rd Ave" |
+| `event_time` | When it happened (free-form) | "2026-04-12", "last Tuesday", "summer 2025" |
+
+**Two timestamps, different meanings:**
+- `event_time` — when the event occurred (user/AI supplied, free-form string)
+- `created_at` / `updated_at` — when the system recorded the memory (auto, ISO 8601)
+
+### Open Type System
+
+Node types and edge types are **open strings** — not enumerated, not validated. The AI agent decides what types to use. Life doesn't fit into 6 categories.
+
+### AI-Constructed Tags
+
+Tags are named concepts that recur across memories (themes, people, places, projects). The AI agent extracts and manages them — humans don't tag directly. Two memories sharing a tag are implicitly related without explicit edges.
+
+---
+
 ## Why
 
-Traditional tools (Linear, Jira) flatten projects into forms, statuses, and boards. The simplification helps humans, but **the storage discards the real structure**.
+Traditional note-taking tools flatten memories into linear lists, folders, or databases. **The structure is lost the moment it's recorded.**
 
-Real projects are **dynamically evolving graphs** — multiple node types (tasks, decisions, risks), multiple relationship types (depends-on, blocks, decomposes-into), continuously changing. GraphMind preserves the full graph. AI agents handle the complexity.
+Human memory is a **graph** — people, places, events, ideas connected by causality, time, association, and meaning. GraphMind preserves the full graph. AI agents handle the complexity of organizing, connecting, and retrieving memories.
 
 ---
 
@@ -118,15 +147,15 @@ AI Agent (Claude Code / Codex / Copilot)
   |  structured JSON
 GraphMind CLI (gm)
   |  read / write
-Graph (SQLite)
+Memory Graph (SQLite)
 ```
 
-1. Human describes what's happening
-2. AI agent asks follow-up questions
-3. AI agent queries the graph for context (`gm ls`, `gm cat`)
-4. AI agent creates a proposal with nodes, edges, and tags (`gm add`, `gm ln`, `gm tag`)
+1. Human describes what happened
+2. AI agent asks follow-up questions — who was there? when? where?
+3. AI agent queries the graph for context (`gm ls`, `gm cat`, `gm grep`)
+4. AI agent creates a proposal with memories, edges, and tags (`gm add`, `gm ln`, `gm tag`)
 5. Human confirms, AI agent commits (`gm commit`)
-6. Repeat as the project evolves
+6. Repeat as life happens
 
 ---
 
@@ -137,10 +166,10 @@ AI agents discover relationships through three complementary layers:
 | Layer | Mechanism | Cost | Purpose |
 |---|---|---|---|
 | **Tags** | Shared named concepts | Low | Discovery entry point — O(N) implicit clustering |
-| **Edges** | Typed directed relationships | High | Structural analysis — depends-on, blocks, decomposes |
+| **Edges** | Typed directed relationships | High | Structural analysis — caused_by, followed_by |
 | **AI Semantic** | Content reasoning at query time | Zero | Deep association on small subgraphs |
 
-Tags are the search funnel entry point. AI agents extract 2–5 tags per node, creating implicit connections without O(N²) explicit edges. See [Design](docs/design.md) for the full rationale.
+Tags are the search funnel entry point. AI agents extract 2–5 tags per memory, creating implicit connections without O(N²) explicit edges. See [Design](docs/design.md) for the full rationale.
 
 ---
 
@@ -149,10 +178,11 @@ Tags are the search funnel entry point. AI agents extract 2–5 tags per node, c
 | Principle | Meaning |
 |---|---|
 | **Graph-first** | Store the real structure, never flatten at the storage layer |
-| **Proposal-first** | All writes staged as proposals, committed after human confirmation |
+| **Proposal-first** | All writes staged as proposals, committed after confirmation |
 | **Event-sourced** | All mutations recorded as events; current state is a projection |
-| **Tags as semantic bridge** | AI-extracted concepts link related nodes without explicit edges |
-| **CLI-as-Tool** | For AI agents, not humans. JSON I/O, semantic exit codes |
+| **AI-friendly first** | Structured JSON I/O, hints, summaries, next-step guidance |
+| **Open types** | Node/edge types are free strings — the AI defines the taxonomy |
+| **Tags as semantic bridge** | AI-constructed concepts link related memories without explicit edges |
 | **Local-first** | SQLite, zero config, single-user first |
 
 ---
@@ -161,9 +191,9 @@ Tags are the search funnel entry point. AI agents extract 2–5 tags per node, c
 
 | Document | Scope |
 |---|---|
-| [Design](docs/design.md) | Why — core thesis, tag system, event sourcing, storage choice |
+| [Design](docs/design.md) | Why — core thesis, open type system, tag system, event sourcing |
 | [Architecture](docs/architecture.md) | What — system layers, packages, data flow |
-| [CLI Specification](docs/cli-spec.md) | API — command contract, type registries |
+| [CLI Specification](docs/cli-spec.md) | API — command contract, open type system, pipeline model |
 | [Conventions](docs/conventions.md) | Rules — naming, Go, database, engineering workflow |
 
 ---

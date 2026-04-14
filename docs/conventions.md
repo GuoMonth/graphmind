@@ -12,11 +12,11 @@ The `gm` CLI is consumed by AI agents. **One concept = one word, everywhere.** C
 
 | Word | Meaning |
 |---|---|
-| `node` | A vertex in the project graph |
-| `edge` | A directed relationship between two nodes |
-| `tag` | An AI-extracted semantic label |
+| `node` | A memory in the graph — an event, person, place, thought, or any recorded entity |
+| `edge` | A directed relationship between two nodes (causal, temporal, associative) |
+| `tag` | An AI-constructed semantic label for thematic clustering |
 | `proposal` | A staged batch of changes awaiting confirmation |
-| `event` | An immutable record of a past mutation |
+| `event` | An immutable record of a past mutation (system concept, not user-facing "memory") |
 | `graph` | The overall structure (virtual, not a DB table) |
 
 ### Canonical actions (internal vocabulary)
@@ -155,7 +155,8 @@ Every connection applies PRAGMAs: WAL mode, foreign keys ON, busy timeout 5s, sy
 | UUID | `TEXT` | Lowercase hyphenated string |
 | Timestamps | `TEXT` | ISO 8601, always UTC |
 | JSON | `TEXT` | Validated in Go, queryable via `json_extract()` |
-| Enums | `TEXT` | Validated in Go, CHECK constraints as safety net |
+| Open types | `TEXT` | Node type, edge type — no CHECK constraint, no enum in Go |
+| Free-form time | `TEXT` | `event_time` — stored as-is, may be fuzzy ("last Tuesday") |
 
 ### Schema conventions
 
