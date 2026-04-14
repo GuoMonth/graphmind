@@ -42,7 +42,7 @@ Safe to run multiple times — migrations are idempotent.`,
 			},
 			fmt.Sprintf("Database initialized at %s.", dbPath),
 			[]string{
-				"gm add --type task --title \"...\"  — create your first node",
+				"gm add --type event --title \"...\"  — create your first node",
 				"gm --help  — see all available commands",
 			},
 		)

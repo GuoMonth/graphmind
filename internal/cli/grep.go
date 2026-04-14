@@ -55,8 +55,8 @@ OUTPUT
 
   Success (array of matching nodes, ranked by relevance):
   {"ok":true,"data":[
-    {"id":"019...","type":"task","title":"Payment processing",...},
-    {"id":"019...","type":"task","title":"Fix payment bug",...}
+    {"id":"019...","type":"event","title":"Payment received from client",...},
+    {"id":"019...","type":"event","title":"Payment system outage",...}
   ]}
 
   No matches:
@@ -81,7 +81,8 @@ OUTPUT
 		if err != nil {
 			return model.WithHint(
 				fmt.Errorf("%w: %s", model.ErrInvalidInput, err),
-				"FTS5 query syntax: use double quotes for phrases, OR/AND/NOT for boolean. Example: gm grep '\"project plan\" OR task'",
+				"FTS5 query syntax: use double quotes for phrases, OR/AND/NOT for boolean."+
+					" Example: gm grep '\"sprint planning\" OR meeting'",
 			)
 		}
 

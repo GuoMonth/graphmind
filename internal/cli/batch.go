@@ -41,9 +41,9 @@ EXAMPLES
   # Create two nodes and link them in one atomic proposal:
   $ cat <<'EOF' | gm batch
   [
-    {"command": "add", "data": {"type": "task", "title": "Design API"}},
-    {"command": "add", "data": {"type": "task", "title": "Implement API"}},
-    {"command": "ln", "data": {"type": "depends_on", "from_reference": 1, "to_reference": 0}},
+    {"command": "add", "data": {"type": "event", "title": "Design review", "who": "Alice"}},
+    {"command": "add", "data": {"type": "event", "title": "Implementation kickoff", "who": "Bob"}},
+    {"command": "ln", "data": {"type": "followed_by", "from_reference": 0, "to_reference": 1}},
     {"command": "tag", "data": {"reference": 0, "tag_name": "api"}},
     {"command": "tag", "data": {"reference": 1, "tag_name": "api"}}
   ]
@@ -82,7 +82,7 @@ OUTPUT
 		if err := json.Unmarshal(input, &rawOps); err != nil {
 			return model.WithHint(
 				fmt.Errorf("%w: invalid JSON: %s", model.ErrInvalidInput, err),
-				`Expected JSON array: [{"command":"add","data":{"type":"task","title":"..."}}]. See 'gm batch --help' for format.`,
+				`Expected JSON array: [{"command":"add","data":{"type":"event","title":"..."}}]. See 'gm batch --help' for format.`,
 			)
 		}
 

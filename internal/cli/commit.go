@@ -21,7 +21,7 @@ Only proposals with status "pending" can be committed.`,
   gm commit 019abc...
 
   # Typical workflow: add then commit
-  PROPOSAL=$(gm add --type task --title "New task" | jq -r '.data.id')
+  PROPOSAL=$(gm add --type event --title "Team standup" | jq -r '.data.id')
   gm commit "$PROPOSAL"
 
   # Output on success:

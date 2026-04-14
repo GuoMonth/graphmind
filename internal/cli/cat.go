@@ -14,7 +14,7 @@ var catCmd = &cobra.Command{
 	Long: `Show the full detail of a single entity by its UUID.
 
 Auto-detects the entity type by trying lookups in order:
-node → edge → tag → proposal. Returns the first match.
+node → edge → tag → tag_edge → proposal. Returns the first match.
 
 Use this to inspect any entity after listing with "gm ls".`,
 	Example: `  # Show a node
@@ -28,10 +28,13 @@ Use this to inspect any entity after listing with "gm ls".`,
   #   "ok": true,
   #   "data": {
   #     "id": "019abc...",
-  #     "type": "task",
-  #     "title": "Build auth module",
-  #     "description": "Implement JWT-based authentication",
-  #     "status": "active",
+  #     "type": "event",
+  #     "title": "Sprint planning meeting",
+  #     "description": "Q1 sprint kickoff with the team",
+  #     "status": "recorded",
+  #     "who": "Alice, Bob",
+  #     "where": "Room A",
+  #     "event_time": "2025-01-15",
   #     "properties": {},
   #     "created_at": "2025-01-15T10:30:00.000Z",
   #     "updated_at": "2025-01-15T10:30:00.000Z"
@@ -43,9 +46,23 @@ Use this to inspect any entity after listing with "gm ls".`,
   #   "ok": true,
   #   "data": {
   #     "id": "019def...",
-  #     "type": "depends_on",
+  #     "type": "caused_by",
   #     "from_id": "019abc...",
   #     "to_id": "019ghi...",
+  #     "properties": {},
+  #     "created_at": "2025-01-15T10:30:00.000Z",
+  #     "updated_at": "2025-01-15T10:30:00.000Z"
+  #   }
+  # }
+
+  # Output (tag_edge example):
+  # {
+  #   "ok": true,
+  #   "data": {
+  #     "id": "019mno...",
+  #     "type": "parent_of",
+  #     "from_id": "019jkl...",
+  #     "to_id": "019pqr...",
   #     "properties": {},
   #     "created_at": "2025-01-15T10:30:00.000Z",
   #     "updated_at": "2025-01-15T10:30:00.000Z"
@@ -59,7 +76,7 @@ Use this to inspect any entity after listing with "gm ls".`,
   #     "id": "019jkl...",
   #     "status": "committed",
   #     "operations": [
-  #       {"action":"create_node","entity":"node","data":{...},"summary":"task: Build auth module"}
+  #       {"action":"create_node","entity":"node","data":{...},"summary":"event: Sprint planning meeting"}
   #     ],
   #     "created_at": "2025-01-15T10:30:00.000Z",
   #     "updated_at": "2025-01-15T10:31:00.000Z"

@@ -15,7 +15,7 @@ var rmCmd = &cobra.Command{
 	Short: "Delete entities → proposal",
 	Long: `Delete one or more entities by ID. Returns a pending proposal.
 
-Auto-detects entity type (node or edge) from the ID. Deleting a node
+Auto-detects entity type (node, edge, or tag_edge) from the ID. Deleting a node
 cascades: its edges and tag associations are also removed.
 
 Multiple IDs create a single proposal with multiple delete operations,
@@ -26,7 +26,7 @@ STDIN PIPELINE
   When stdin is a pipe, reads JSONL (one JSON object per line) and
   extracts "id" from each object. This enables pipeline composition:
 
-  gm ls node --type task | gm grep "deprecated" | gm rm
+  gm ls node --type event | gm grep "deprecated" | gm rm
 
 EXAMPLES
 
