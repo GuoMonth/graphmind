@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/senguoyun-guosheng/graphmind/internal/db"
@@ -270,9 +271,15 @@ func pluralize(singular, plural string, n int) string {
 }
 
 func writeJSON(v any) {
-	enc := json.NewEncoder(os.Stdout)
+	enc := newJSONEncoder(os.Stdout)
 	if pretty {
 		enc.SetIndent("", "  ")
 	}
 	enc.Encode(v)
+}
+
+func newJSONEncoder(w io.Writer) *json.Encoder {
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	return enc
 }

@@ -37,7 +37,7 @@ FLAGS
   --status       Optional initial status string
   --who          Who was involved (free-form)
   --where        Where it happened (free-form)
-  --event-time   When it happened (free-form: "2024年夏天", "last Tuesday", ISO 8601)
+  --event-time   When it happened (free-form: "summer 2024", "last Tuesday", ISO 8601)
 
 STDIN FORMAT
   When piping JSON, provide a single object with the same field names:
