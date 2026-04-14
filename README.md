@@ -1,37 +1,37 @@
 # GraphMind
 
-**Graph-based memory storage, built natively for AI agents.**
+**Graph-based event recording, built natively for AI agents.**
 
-GraphMind is a local-first CLI that AI agents ([Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex](https://openai.com/index/codex/), [Copilot](https://github.com/features/copilot)) use to record and retrieve human memories as a graph stored in SQLite. Humans describe what happened. The AI agent captures who, when, where — and builds the connections.
+GraphMind is a local-first CLI that AI agents ([Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex](https://openai.com/index/codex/), [Copilot](https://github.com/features/copilot)) use to record and retrieve events as a graph stored in SQLite. Humans describe what happened. The AI agent captures who, when, where — and builds the connections.
 
-> _"I just describe what happened, and the system remembers it — with all the people, places, and connections."_
+> _"I just describe what happened, and the system records it — with all the people, places, and connections."_
 
 ---
 
 ## Quick Start
 
 ```bash
-# Initialize the memory graph
+# Initialize the event graph
 gm init
 
-# Record a memory (returns a pending proposal)
+# Record an event (returns a pending proposal)
 gm add --type event --title "Had dinner with David" \
        --who "David, Lisa" --where "Bangkok Kitchen" --event-time "2026-04-12"
 
-# Link memories with a typed edge
+# Link events with a typed edge
 gm ln <from-id> <to-id> --type followed_by
 
-# Tag a memory (creates the tag if it doesn't exist)
+# Tag an event (creates the tag if it doesn't exist)
 gm tag <node-id> "thailand-trip"
 
-# Update a memory with new details
+# Update an event with new details
 gm mv <node-id> --who "David, Lisa, James" --event-time "last Friday evening"
 
 # Commit a proposal — applies all operations atomically
 gm commit <proposal-id>
 
-# List memories
-gm ls node                         # all memories
+# List events
+gm ls node                         # all nodes
 gm ls node --type event            # only events
 gm ls edge --type caused_by        # causal edges
 gm ls tag                          # all tags
@@ -45,7 +45,7 @@ gm cat <id>
 # View event history
 gm log --since 24h
 
-# Delete a memory (cascade removes edges and tag associations)
+# Delete a node (cascade removes edges and tag associations)
 gm rm <node-id>
 ```
 
@@ -59,7 +59,7 @@ All commands output JSON envelopes (`{"ok": true, "data": ...}`), making them co
 
 | Command | Description |
 |---------|-------------|
-| `gm add` | Create a memory node — type, title, who, where, event_time |
+| `gm add` | Create a node — type, title, who, where, event_time |
 | `gm ln` | Create a directed edge between two nodes |
 | `gm tag` | Associate a tag with a node (upsert) |
 | `gm mv` | Update a node (title, who, where, event_time, status, properties) |
@@ -86,7 +86,7 @@ All commands output JSON envelopes (`{"ok": true, "data": ...}`), making them co
 
 | Command | Description |
 |---------|-------------|
-| `gm init` | Initialize memory graph database |
+| `gm init` | Initialize event graph database |
 
 ### Proposal-First Writes
 
@@ -104,9 +104,9 @@ gm commit <proposal-id>
 
 ## Core Concepts
 
-### Memory Nodes
+### Event Nodes
 
-Every record is a **memory** — something that happened, was observed, decided, or thought. Memories have dedicated fields for the essential context:
+The primary node type is an **event** — something that happened, was observed, decided, or thought. Events have dedicated fields for the essential context:
 
 | Field | Purpose | Example |
 |---|---|---|
@@ -118,7 +118,7 @@ Every record is a **memory** — something that happened, was observed, decided,
 
 **Two timestamps, different meanings:**
 - `event_time` — when the event occurred (user/AI supplied, free-form string)
-- `created_at` / `updated_at` — when the system recorded the memory (auto, ISO 8601)
+- `created_at` / `updated_at` — when the system recorded the node (auto, ISO 8601)
 
 ### Open Type System
 
@@ -126,15 +126,15 @@ Node types and edge types are **open strings** — not enumerated, not validated
 
 ### AI-Constructed Tags
 
-Tags are named concepts that recur across memories (themes, people, places, projects). The AI agent extracts and manages them — humans don't tag directly. Two memories sharing a tag are implicitly related without explicit edges.
+Tags are named concepts that recur across events (themes, people, places, projects). The AI agent extracts and manages them — humans don't tag directly. Two events sharing a tag are implicitly related without explicit edges.
 
 ---
 
 ## Why
 
-Traditional note-taking tools flatten memories into linear lists, folders, or databases. **The structure is lost the moment it's recorded.**
+Traditional note-taking tools flatten events into linear lists, folders, or databases. **The structure is lost the moment it's recorded.**
 
-Human memory is a **graph** — people, places, events, ideas connected by causality, time, association, and meaning. GraphMind preserves the full graph. AI agents handle the complexity of organizing, connecting, and retrieving memories.
+Life is a stream of events — people, places, things that happen, connected by causality, time, association, and meaning. GraphMind preserves the full graph. AI agents handle the complexity of organizing, connecting, and retrieving events.
 
 ---
 
@@ -147,13 +147,13 @@ AI Agent (Claude Code / Codex / Copilot)
   |  structured JSON
 GraphMind CLI (gm)
   |  read / write
-Memory Graph (SQLite)
+Event Graph (SQLite)
 ```
 
 1. Human describes what happened
 2. AI agent asks follow-up questions — who was there? when? where?
 3. AI agent queries the graph for context (`gm ls`, `gm cat`, `gm grep`)
-4. AI agent creates a proposal with memories, edges, and tags (`gm add`, `gm ln`, `gm tag`)
+4. AI agent creates a proposal with events, edges, and tags (`gm add`, `gm ln`, `gm tag`)
 5. Human confirms, AI agent commits (`gm commit`)
 6. Repeat as life happens
 
@@ -169,7 +169,7 @@ AI agents discover relationships through three complementary layers:
 | **Edges** | Typed directed relationships | High | Structural analysis — caused_by, followed_by |
 | **AI Semantic** | Content reasoning at query time | Zero | Deep association on small subgraphs |
 
-Tags are the search funnel entry point. AI agents extract 2–5 tags per memory, creating implicit connections without O(N²) explicit edges. See [Design](docs/design.md) for the full rationale.
+Tags are the search funnel entry point. AI agents extract 2–5 tags per event, creating implicit connections without O(N²) explicit edges. See [Design](docs/design.md) for the full rationale.
 
 ---
 
@@ -179,10 +179,10 @@ Tags are the search funnel entry point. AI agents extract 2–5 tags per memory,
 |---|---|
 | **Graph-first** | Store the real structure, never flatten at the storage layer |
 | **Proposal-first** | All writes staged as proposals, committed after confirmation |
-| **Event-sourced** | All mutations recorded as events; current state is a projection |
+| **Event-sourced** | All mutations recorded as system events; current state is a projection |
 | **AI-friendly first** | Structured JSON I/O, hints, summaries, next-step guidance |
 | **Open types** | Node/edge types are free strings — the AI defines the taxonomy |
-| **Tags as semantic bridge** | AI-constructed concepts link related memories without explicit edges |
+| **Tags as semantic bridge** | AI-constructed concepts link related events without explicit edges |
 | **Local-first** | SQLite, zero config, single-user first |
 
 ---

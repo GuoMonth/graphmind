@@ -12,11 +12,11 @@ The `gm` CLI is consumed by AI agents. **One concept = one word, everywhere.** C
 
 | Word | Meaning |
 |---|---|
-| `node` | A memory in the graph — an event, person, place, thought, or any recorded entity |
+| `node` | A vertex in the graph — an event, person, place, or any recorded entity |
 | `edge` | A directed relationship between two nodes (causal, temporal, associative) |
 | `tag` | An AI-constructed semantic label for thematic clustering |
 | `proposal` | A staged batch of changes awaiting confirmation |
-| `event` | An immutable record of a past mutation (system concept, not user-facing "memory") |
+| `event` | An immutable record of a past mutation (system concept, distinct from user-facing "event" node type) |
 | `graph` | The overall structure (virtual, not a DB table) |
 
 ### Canonical actions (internal vocabulary)

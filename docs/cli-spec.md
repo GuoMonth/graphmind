@@ -138,18 +138,18 @@ Commands compose via `|` pipes. **Read commands filter, write commands batch.**
 ### Pipeline examples
 
 ```bash
-# Find memories about travel and show their relationship tree
+# Find events about travel and show their relationship tree
 gm ls node --type event | gm grep "travel" | gm tree --depth 2
 
-# Tag all memories matching a pattern
+# Tag all events matching a pattern
 gm ls node | gm grep "Bangkok" | gm tag --name "thailand-trip"
 gm commit <proposal-id>
 
-# Delete all archived memories
+# Delete all archived events
 gm grep "archived" | gm rm
 gm commit <proposal-id>
 
-# Show event log for memories with a specific tag
+# Show event log for nodes with a specific tag
 gm find --tag "startup-idea" | gm log
 
 # List orphan tags (0 associated nodes)
@@ -205,7 +205,7 @@ Entity defaults to `node` when omitted.
 
 ```bash
 gm ls                          # list nodes (default)
-gm ls node --type event        # list event memories
+gm ls node --type event        # list event nodes
 gm ls edge --type caused_by    # list causal edges
 gm ls tag                      # list all tags
 gm ls proposal --status pending  # list pending proposals
@@ -277,7 +277,7 @@ Combines tag matching, type filtering, and neighborhood expansion in one call.
 | `--limit <n>` | Max results |
 | `--after <cursor>` | Cursor for pagination |
 
-Primary AI agent pattern: find anchor memories, load surrounding context.
+Primary AI agent pattern: find anchor nodes, load surrounding context.
 
 ```bash
 gm find --tag "thailand-trip" --type event --expand 2
@@ -347,7 +347,7 @@ Without arguments: total counts (nodes by type, edges by type, tags, events). Wi
 
 ### gm add
 
-Create a memory node. Returns a pending proposal.
+Create an event node. Returns a pending proposal.
 
 ```
 echo '<json>' | gm add
@@ -446,7 +446,7 @@ gm untag <node-id> <tag-name>
 
 ### gm mv <id>
 
-Update a memory node's fields. Returns a pending proposal.
+Update a node's fields. Returns a pending proposal.
 
 ```
 echo '<json>' | gm mv <id>
@@ -619,7 +619,7 @@ Node types and edge types are **open strings** — not enumerated, not validated
 | Type | Use when |
 |---|---|
 | `event` | Something that happened ("Had dinner with David") |
-| `person` | A person who appears in memories ("David Chen") |
+| `person` | A person who appears in events ("David Chen") |
 | `place` | A location that recurs ("Bangkok Kitchen") |
 | `thought` | An idea, reflection, or realization |
 | `meeting` | A scheduled gathering |
