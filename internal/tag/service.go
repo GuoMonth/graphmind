@@ -3,6 +3,7 @@ package tag
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -240,4 +241,206 @@ func (s *Service) ListTags(ctx context.Context, f ListTagsFilter) ([]model.Tag, 
 	}
 
 	return tags, rows.Err()
+}
+
+// CreateTagEdgeInput defines the input for creating a tag edge.
+type CreateTagEdgeInput struct {
+	Type       string         `json:"type"`
+	FromID     string         `json:"from_id"`
+	ToID       string         `json:"to_id"`
+	Properties map[string]any `json:"properties"` // JSON flexible properties
+}
+
+// CreateTagEdge creates a directed edge between two tags within the given transaction.
+func (s *Service) CreateTagEdge(ctx context.Context, tx *sql.Tx, input CreateTagEdgeInput) (*model.TagEdge, error) {
+	if input.Type == "" {
+		return nil, model.WithHint(
+			fmt.Errorf("%w: tag edge type is required", model.ErrInvalidInput),
+			"Provide --type <type>. Common types: parent_of, synonym_of, related_to, opposite_of.",
+		)
+	}
+	if input.FromID == "" || input.ToID == "" {
+		return nil, model.WithHint(
+			fmt.Errorf("%w: from_id and to_id are required", model.ErrInvalidInput),
+			"Usage: gm ln <tag-id> <tag-id> --type <edge-type>",
+		)
+	}
+	if input.FromID == input.ToID {
+		return nil, model.WithHint(
+			fmt.Errorf("%w: self-referencing tag edge not allowed", model.ErrInvalidInput),
+			"The from_id and to_id must be different tags.",
+		)
+	}
+
+	// Verify both tags exist
+	var exists int
+	if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM tags WHERE id = ?", input.FromID).Scan(&exists); err != nil {
+		return nil, fmt.Errorf("check from_id tag: %w", err)
+	}
+	if exists == 0 {
+		return nil, model.WithHint(
+			fmt.Errorf("%w: from_id tag does not exist", model.ErrNotFound),
+			fmt.Sprintf("Tag %q not found. Use 'gm ls tag' to list tags.", input.FromID),
+		)
+	}
+	if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM tags WHERE id = ?", input.ToID).Scan(&exists); err != nil {
+		return nil, fmt.Errorf("check to_id tag: %w", err)
+	}
+	if exists == 0 {
+		return nil, model.WithHint(
+			fmt.Errorf("%w: to_id tag does not exist", model.ErrNotFound),
+			fmt.Sprintf("Tag %q not found. Use 'gm ls tag' to list tags.", input.ToID),
+		)
+	}
+
+	id, err := uuid.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("generate tag edge id: %w", err)
+	}
+
+	props := input.Properties
+	if props == nil {
+		props = map[string]any{} // default empty
+	}
+	propsJSON, err := json.Marshal(props)
+	if err != nil {
+		return nil, fmt.Errorf("marshal properties: %w", err)
+	}
+
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO tag_edges (id, type, from_id, to_id, properties) VALUES (?, ?, ?, ?, ?)`,
+		id.String(), input.Type, input.FromID, input.ToID, string(propsJSON),
+	)
+	if err != nil {
+		return nil, model.WithHint(
+			fmt.Errorf("%w: %v", model.ErrConflict, err),
+			"A tag edge with the same type between these tags may already exist. Use 'gm ls tag_edge' to check.",
+		)
+	}
+
+	if err := s.event.Append(ctx, tx, "tag_edge", id.String(), model.ActionTagEdgeCreated, input); err != nil {
+		return nil, fmt.Errorf("append tag_edge_created event: %w", err)
+	}
+
+	return s.getTagEdgeTx(ctx, tx, id.String())
+}
+
+// GetTagEdge retrieves a tag edge by ID.
+func (s *Service) GetTagEdge(ctx context.Context, id string) (*model.TagEdge, error) {
+	return s.scanTagEdge(s.db.QueryRowContext(ctx,
+		`SELECT id, type, from_id, to_id, properties, created_at, updated_at FROM tag_edges WHERE id = ?`, id,
+	))
+}
+
+func (s *Service) getTagEdgeTx(ctx context.Context, tx *sql.Tx, id string) (*model.TagEdge, error) {
+	return s.scanTagEdge(tx.QueryRowContext(ctx,
+		`SELECT id, type, from_id, to_id, properties, created_at, updated_at FROM tag_edges WHERE id = ?`, id,
+	))
+}
+
+func (s *Service) scanTagEdge(row *sql.Row) (*model.TagEdge, error) {
+	var e model.TagEdge
+	var propsJSON, createdAt, updatedAt string
+	err := row.Scan(&e.ID, &e.Type, &e.FromID, &e.ToID, &propsJSON, &createdAt, &updatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, model.WithHint(
+			fmt.Errorf("%w: tag_edge", model.ErrNotFound),
+			"Use 'gm ls tag_edge' to list existing tag edges.",
+		)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("scan tag edge: %w", err)
+	}
+	if err := json.Unmarshal([]byte(propsJSON), &e.Properties); err != nil {
+		return nil, fmt.Errorf("unmarshal tag edge properties: %w", err)
+	}
+	if e.CreatedAt, err = model.ParseTime(createdAt); err != nil {
+		return nil, err
+	}
+	if e.UpdatedAt, err = model.ParseTime(updatedAt); err != nil {
+		return nil, err
+	}
+	return &e, nil
+}
+
+// DeleteTagEdge removes a tag edge by ID within the given transaction.
+func (s *Service) DeleteTagEdge(ctx context.Context, tx *sql.Tx, id string) error {
+	if id == "" {
+		return model.WithHint(
+			fmt.Errorf("%w: id is required", model.ErrInvalidInput),
+			"Provide the tag edge UUID. Use 'gm ls tag_edge' to find IDs.",
+		)
+	}
+
+	if _, err := s.getTagEdgeTx(ctx, tx, id); err != nil {
+		return err
+	}
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM tag_edges WHERE id = ?", id); err != nil {
+		return fmt.Errorf("delete tag edge: %w", err)
+	}
+
+	if err := s.event.Append(ctx, tx, "tag_edge", id, model.ActionTagEdgeDeleted, map[string]string{"id": id}); err != nil {
+		return fmt.Errorf("append tag_edge_deleted event: %w", err)
+	}
+
+	return nil
+}
+
+// ListTagEdgesFilter defines filters for listing tag edges.
+type ListTagEdgesFilter struct {
+	Type  string
+	Limit int
+	After string
+}
+
+// ListTagEdges returns tag edges matching the given filters.
+func (s *Service) ListTagEdges(ctx context.Context, f ListTagEdgesFilter) ([]model.TagEdge, error) {
+	query := "SELECT id, type, from_id, to_id, properties, created_at, updated_at FROM tag_edges WHERE 1=1"
+	var args []any // sql scanning requires any
+
+	if f.Type != "" {
+		query += " AND type = ?"
+		args = append(args, f.Type)
+	}
+	if f.After != "" {
+		query += " AND id < ?"
+		args = append(args, f.After)
+	}
+
+	query += " ORDER BY created_at DESC"
+
+	limit := f.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	query += " LIMIT ?"
+	args = append(args, limit)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query tag edges: %w", err)
+	}
+	defer rows.Close()
+
+	tagEdges := []model.TagEdge{}
+	for rows.Next() {
+		var e model.TagEdge
+		var propsJSON, createdAt, updatedAt string
+		if err := rows.Scan(&e.ID, &e.Type, &e.FromID, &e.ToID, &propsJSON, &createdAt, &updatedAt); err != nil {
+			return nil, fmt.Errorf("scan tag edge: %w", err)
+		}
+		if err := json.Unmarshal([]byte(propsJSON), &e.Properties); err != nil {
+			return nil, fmt.Errorf("unmarshal tag edge properties: %w", err)
+		}
+		if e.CreatedAt, err = model.ParseTime(createdAt); err != nil {
+			return nil, err
+		}
+		if e.UpdatedAt, err = model.ParseTime(updatedAt); err != nil {
+			return nil, err
+		}
+		tagEdges = append(tagEdges, e)
+	}
+
+	return tagEdges, rows.Err()
 }

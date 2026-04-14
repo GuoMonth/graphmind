@@ -555,17 +555,17 @@ func TestCommitBatchChainWithTags(t *testing.T) {
 }
 
 func TestCommitBatchRollbackOnError(t *testing.T) {
-	// First op succeeds, second op fails — nothing should be persisted
+	// First op succeeds, second op fails (empty title) — nothing should be persisted
 	env := setup(t)
 
 	p, _ := env.proposal.Create(env.ctx, []model.ProposalOperation{
-		{Action: model.OpCreateNode, Entity: "node", Data: map[string]any{"type": "task", "title": "Good node"}},
-		{Action: model.OpCreateNode, Entity: "node", Data: map[string]any{"type": "invalid_type", "title": "Bad node"}},
+		{Action: model.OpCreateNode, Entity: "node", Data: map[string]any{"type": "event", "title": "Good node"}},
+		{Action: model.OpCreateNode, Entity: "node", Data: map[string]any{"type": "event", "title": ""}},
 	})
 
 	_, err := env.proposal.Commit(env.ctx, p.ID)
 	if err == nil {
-		t.Fatal("expected error for invalid node type, got nil")
+		t.Fatal("expected error for empty title, got nil")
 	}
 
 	// No nodes should have been created (atomic rollback)

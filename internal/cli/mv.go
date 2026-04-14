@@ -15,6 +15,9 @@ var (
 	mvDescription string
 	mvStatus      string
 	mvType        string
+	mvWho         string
+	mvWhere       string
+	mvEventTime   string
 )
 
 var mvCmd = &cobra.Command{
@@ -31,37 +34,16 @@ ACCEPTED FLAGS
   --title         New title
   --description   New description
   --status        New status
-  --type          New node type (must be a valid type)
+  --type          New node type (open string)
+  --who           Who was involved
+  --where         Where it happened
+  --event-time    When it happened (free-form)
 
 STDIN JSON (alternative to flags, takes priority)
 
   Provide a partial JSON object. Only included fields are updated:
 
-  {"status": "done", "properties": {"completed_at": "2026-04-13"}}
-
-EXAMPLES
-
-  # Update status via flag:
-  $ gm mv 019abc... --status done
-
-  # Update multiple fields:
-  $ gm mv 019abc... --title "Renamed task" --status in_progress
-
-  # Update via stdin JSON (partial — only status changes):
-  $ echo '{"status":"done"}' | gm mv 019abc...
-
-  # Update with properties merge:
-  $ echo '{"properties":{"priority":"high","estimate":"2h"}}' | gm mv 019abc...
-
-OUTPUT
-
-  Success (pending proposal):
-  {"ok":true,"data":{"id":"<proposal-id>","status":"pending",
-    "operations":[{"action":"update_node","entity":"node",
-    "data":{...},"summary":"update: <title>"}],...}}
-
-  Error — node not found:
-  {"ok":false,"error":{"code":"NOT_FOUND","message":"not found: node"}}`,
+  {"status": "done", "who": "Alice", "event_time": "2025-01-15"}`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		id := args[0]
@@ -79,10 +61,16 @@ OUTPUT
 			data["status"] = mvStatus
 		}
 		if cmd.Flags().Changed("type") {
-			if !model.IsValidNodeType(mvType) {
-				return fmt.Errorf("%w: invalid node type %q", model.ErrInvalidInput, mvType)
-			}
 			data["type"] = mvType
+		}
+		if cmd.Flags().Changed("who") {
+			data["who"] = mvWho
+		}
+		if cmd.Flags().Changed("where") {
+			data["where"] = mvWhere
+		}
+		if cmd.Flags().Changed("event-time") {
+			data["event_time"] = mvEventTime
 		}
 
 		// If stdin has data, use it (merged with id)
@@ -136,4 +124,7 @@ func init() {
 	mvCmd.Flags().StringVar(&mvDescription, "description", "", "New description")
 	mvCmd.Flags().StringVar(&mvStatus, "status", "", "New status")
 	mvCmd.Flags().StringVar(&mvType, "type", "", "New node type")
+	mvCmd.Flags().StringVar(&mvWho, "who", "", "Who was involved")
+	mvCmd.Flags().StringVar(&mvWhere, "where", "", "Where it happened")
+	mvCmd.Flags().StringVar(&mvEventTime, "event-time", "", "When it happened (free-form)")
 }

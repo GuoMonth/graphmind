@@ -49,7 +49,7 @@ func (e *testEnv) beginTx(t *testing.T) *sql.Tx {
 func (e *testEnv) createNode(t *testing.T, title string) *model.Node {
 	t.Helper()
 	tx := e.beginTx(t)
-	n, err := e.graph.CreateNode(e.ctx, tx, graph.CreateNodeInput{
+	n, err := e.graph.CreateNode(e.ctx, tx, &graph.CreateNodeInput{
 		Type:  "task",
 		Title: title,
 	})

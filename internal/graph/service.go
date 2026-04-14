@@ -30,15 +30,18 @@ type CreateNodeInput struct {
 	Title       string         `json:"title"`
 	Description string         `json:"description"`
 	Status      string         `json:"status"`
+	Who         string         `json:"who"`
+	Where       string         `json:"where"`
+	EventTime   string         `json:"event_time"`
 	Properties  map[string]any `json:"properties"` // JSON flexible properties
 }
 
 // CreateNode creates a new node within the given transaction.
-func (s *Service) CreateNode(ctx context.Context, tx *sql.Tx, input CreateNodeInput) (*model.Node, error) {
-	if !model.IsValidNodeType(input.Type) {
+func (s *Service) CreateNode(ctx context.Context, tx *sql.Tx, input *CreateNodeInput) (*model.Node, error) {
+	if input.Type == "" {
 		return nil, model.WithHint(
-			fmt.Errorf("%w: invalid node type %q", model.ErrInvalidInput, input.Type),
-			fmt.Sprintf("Valid node types: %v. Use --type <type> with 'gm add'.", model.AllNodeTypes()),
+			fmt.Errorf("%w: type is required", model.ErrInvalidInput),
+			"Provide --type <type> with 'gm add'. Common types: event, person, place.",
 		)
 	}
 	if input.Title == "" {
@@ -63,8 +66,8 @@ func (s *Service) CreateNode(ctx context.Context, tx *sql.Tx, input CreateNodeIn
 	}
 
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO nodes (id, type, title, description, status, properties) VALUES (?, ?, ?, ?, ?, ?)`,
-		id.String(), input.Type, input.Title, input.Description, input.Status, string(propsJSON),
+		`INSERT INTO nodes (id, type, title, description, status, who, "where", event_time, properties) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id.String(), input.Type, input.Title, input.Description, input.Status, input.Who, input.Where, input.EventTime, string(propsJSON),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert node: %w", err)
@@ -79,21 +82,23 @@ func (s *Service) CreateNode(ctx context.Context, tx *sql.Tx, input CreateNodeIn
 
 // GetNode retrieves a node by ID.
 func (s *Service) GetNode(ctx context.Context, id string) (*model.Node, error) {
-	return s.scanNode(s.db.QueryRowContext(ctx,
-		`SELECT id, type, title, description, status, properties, created_at, updated_at FROM nodes WHERE id = ?`, id,
-	))
+	const nodeSelect = `SELECT id, type, title, description, status,
+		who, "where", event_time, properties,
+		created_at, updated_at FROM nodes WHERE id = ?`
+	return s.scanNode(s.db.QueryRowContext(ctx, nodeSelect, id))
 }
 
 func (s *Service) getNodeTx(ctx context.Context, tx *sql.Tx, id string) (*model.Node, error) {
-	return s.scanNode(tx.QueryRowContext(ctx,
-		`SELECT id, type, title, description, status, properties, created_at, updated_at FROM nodes WHERE id = ?`, id,
-	))
+	const nodeSelect = `SELECT id, type, title, description, status,
+		who, "where", event_time, properties,
+		created_at, updated_at FROM nodes WHERE id = ?`
+	return s.scanNode(tx.QueryRowContext(ctx, nodeSelect, id))
 }
 
 func (s *Service) scanNode(row *sql.Row) (*model.Node, error) {
 	var n model.Node
 	var propsJSON, createdAt, updatedAt string
-	err := row.Scan(&n.ID, &n.Type, &n.Title, &n.Description, &n.Status, &propsJSON, &createdAt, &updatedAt)
+	err := row.Scan(&n.ID, &n.Type, &n.Title, &n.Description, &n.Status, &n.Who, &n.Where, &n.EventTime, &propsJSON, &createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, model.WithHint(
 			fmt.Errorf("%w: node", model.ErrNotFound),
@@ -124,6 +129,9 @@ type UpdateNodeInput struct {
 	Title       string         `json:"title"`
 	Description *string        `json:"description"` // pointer to distinguish "" from unset
 	Status      string         `json:"status"`
+	Who         string         `json:"who"`
+	Where       string         `json:"where"`
+	EventTime   string         `json:"event_time"`
 	Properties  map[string]any `json:"properties"` // JSON flexible properties
 }
 
@@ -156,12 +164,6 @@ func (s *Service) UpdateNode(ctx context.Context, tx *sql.Tx, input *UpdateNodeI
 	args := []any{} // sql args require any
 
 	if input.Type != "" {
-		if !model.IsValidNodeType(input.Type) {
-			return nil, model.WithHint(
-				fmt.Errorf("%w: invalid node type %q", model.ErrInvalidInput, input.Type),
-				fmt.Sprintf("Valid node types: %v.", model.AllNodeTypes()),
-			)
-		}
 		sets = append(sets, "type = ?")
 		args = append(args, input.Type)
 	}
@@ -177,6 +179,18 @@ func (s *Service) UpdateNode(ctx context.Context, tx *sql.Tx, input *UpdateNodeI
 		sets = append(sets, "status = ?")
 		args = append(args, input.Status)
 	}
+	if input.Who != "" {
+		sets = append(sets, "who = ?")
+		args = append(args, input.Who)
+	}
+	if input.Where != "" {
+		sets = append(sets, `"where" = ?`)
+		args = append(args, input.Where)
+	}
+	if input.EventTime != "" {
+		sets = append(sets, "event_time = ?")
+		args = append(args, input.EventTime)
+	}
 	if input.Properties != nil {
 		mergedJSON, err := mergeProperties(existing.Properties, input.Properties)
 		if err != nil {
@@ -189,7 +203,9 @@ func (s *Service) UpdateNode(ctx context.Context, tx *sql.Tx, input *UpdateNodeI
 	if len(sets) == 0 {
 		return nil, model.WithHint(
 			fmt.Errorf("%w: no fields to update", model.ErrInvalidInput),
-			"Provide at least one of: --title, --description, --status, --type, or properties via stdin JSON.",
+			"Provide at least one of: --title, --description, --status,"+
+				" --type, --who, --where, --event-time,"+
+				" or properties via stdin JSON.",
 		)
 	}
 
@@ -289,7 +305,9 @@ func (s *Service) SearchNodes(ctx context.Context, f SearchNodesFilter) ([]model
 		)
 	}
 
-	query := `SELECT n.id, n.type, n.title, n.description, n.status, n.properties, n.created_at, n.updated_at
+	query := `SELECT n.id, n.type, n.title, n.description, n.status,
+		n.who, n."where", n.event_time, n.properties,
+		n.created_at, n.updated_at
 		FROM nodes_fts fts
 		JOIN nodes n ON n.rowid = fts.rowid
 		WHERE nodes_fts MATCH ?`
@@ -319,7 +337,11 @@ func (s *Service) SearchNodes(ctx context.Context, f SearchNodesFilter) ([]model
 	for rows.Next() {
 		var n model.Node
 		var propsJSON, createdAt, updatedAt string
-		if err := rows.Scan(&n.ID, &n.Type, &n.Title, &n.Description, &n.Status, &propsJSON, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(
+			&n.ID, &n.Type, &n.Title, &n.Description, &n.Status,
+			&n.Who, &n.Where, &n.EventTime,
+			&propsJSON, &createdAt, &updatedAt,
+		); err != nil {
 			return nil, fmt.Errorf("scan search result: %w", err)
 		}
 		if err := json.Unmarshal([]byte(propsJSON), &n.Properties); err != nil {
@@ -347,7 +369,9 @@ type ListNodesFilter struct {
 
 // ListNodes returns nodes matching the given filters.
 func (s *Service) ListNodes(ctx context.Context, f ListNodesFilter) ([]model.Node, error) {
-	query := "SELECT id, type, title, description, status, properties, created_at, updated_at FROM nodes WHERE 1=1"
+	query := `SELECT id, type, title, description, status,
+		who, "where", event_time, properties,
+		created_at, updated_at FROM nodes WHERE 1=1`
 	var args []any // sql scanning requires any
 
 	if f.Type != "" {
@@ -386,7 +410,7 @@ func (s *Service) ListNodes(ctx context.Context, f ListNodesFilter) ([]model.Nod
 		var propsJSON, createdAt, updatedAt string
 		err := rows.Scan(
 			&n.ID, &n.Type, &n.Title, &n.Description,
-			&n.Status, &propsJSON, &createdAt, &updatedAt,
+			&n.Status, &n.Who, &n.Where, &n.EventTime, &propsJSON, &createdAt, &updatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan node: %w", err)
@@ -455,10 +479,10 @@ func (s *Service) CreateEdge(ctx context.Context, tx *sql.Tx, input CreateEdgeIn
 func (s *Service) validateEdgeInput(
 	ctx context.Context, tx *sql.Tx, input CreateEdgeInput,
 ) error {
-	if !model.IsValidEdgeType(input.Type) {
+	if input.Type == "" {
 		return model.WithHint(
-			fmt.Errorf("%w: invalid edge type %q", model.ErrInvalidInput, input.Type),
-			fmt.Sprintf("Valid edge types: %v. Use --type <type> with 'gm ln'.", model.AllEdgeTypes()),
+			fmt.Errorf("%w: edge type is required", model.ErrInvalidInput),
+			"Provide --type <type> with 'gm ln'. Common types: caused_by, followed_by, related_to.",
 		)
 	}
 	if input.FromID == "" || input.ToID == "" {
@@ -498,10 +522,8 @@ func (s *Service) validateEdgeInput(
 		)
 	}
 
-	if model.IsDirectionalEdgeType(input.Type) {
-		return s.detectCycle(ctx, tx, input.Type, input.FromID, input.ToID)
-	}
-	return nil
+	// Always check for same-type cycles on directed edges
+	return s.detectCycle(ctx, tx, input.Type, input.FromID, input.ToID)
 }
 
 // detectCycle checks if adding an edge from->to would create a cycle using recursive CTE.

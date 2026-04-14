@@ -36,10 +36,10 @@ var svc services
 
 var rootCmd = &cobra.Command{
 	Use:           "gm",
-	Short:         "GraphMind — graph-based project management for AI agents",
+	Short:         "GraphMind — graph-based event recording for AI agents",
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	Long: `GraphMind (gm) — graph-based project management CLI designed for AI agents.
+	Long: `GraphMind (gm) — graph-based event recording CLI designed for AI agents.
 
 All data is stored as a directed graph in SQLite. All write operations go
 through a proposal workflow: write commands create pending proposals, which
@@ -48,9 +48,16 @@ must be explicitly committed or rejected before they modify the graph.
 CORE CONCEPTS
 
   Graph Model
-    Node  — a project entity with type, title, description, status, properties
-    Edge  — a directed relationship between two nodes (from → to)
-    Tag   — a semantic label attached to one or more nodes
+    Node     — a recorded entity (event, person, place, or any concept)
+    Edge     — a directed relationship between two nodes (from → to)
+    Tag      — an AI-constructed semantic label for thematic clustering
+    TagEdge  — a directed relationship between two tags (conceptual link)
+
+  Open Type System
+    Node types and edge types are open strings — no fixed enum.
+    Common node types: event, person, place, concept
+    Common edge types: caused_by, followed_by, related_to, involves
+    Common tag edge types: parent_of, synonym_of, related_to, opposite_of
 
   Proposal-First Writes
     Write commands (add, ln, tag) never modify the graph directly.
@@ -72,25 +79,16 @@ CORE CONCEPTS
 
   Exit Codes
     0   Success
-    1   INVALID_INPUT   bad arguments, missing fields, unknown type
+    1   INVALID_INPUT   bad arguments, missing fields
     2   NOT_FOUND       entity does not exist
     3   CONFLICT        duplicate, cycle detected, or invalid state transition
     10  INTERNAL        unexpected error
 
-ENTITY TYPES
-
-  Node types:  task | epic | decision | risk | release | discussion
-  Edge types:  depends_on | blocks | decompose | caused_by | related_to | supersedes
-  Tag:         any string name (auto-created on first use)
-
-  Directional edges (all except related_to) are checked for same-type
-  cycles when created. related_to is a symmetric association (no cycle check).
-
 COMMANDS
 
   Write (returns a pending proposal):
-    add        Create a node                  gm add --type task --title "..."
-    ln         Create an edge                 gm ln <from-id> <to-id> --type depends_on
+    add        Create a node                  gm add --type event --title "..."
+    ln         Create an edge (node or tag)   gm ln <from-id> <to-id> --type caused_by
     tag        Tag a node                     gm tag <node-id> <tag-name>
     mv         Update a node                  gm mv <id> --status done
     rm         Delete entities                gm rm <id> [<id>...]
@@ -101,7 +99,7 @@ COMMANDS
     reject     Discard a pending proposal     gm reject <proposal-id>
 
   Read (query the graph):
-    ls         List entities with filters     gm ls node --type task --limit 10
+    ls         List entities with filters     gm ls node --type event --limit 10
     cat        Show full detail by ID         gm cat <entity-id>
     grep       Full-text search (FTS5)        gm grep "payment"
     log        View event history             gm log --since 24h
@@ -118,24 +116,14 @@ GLOBAL FLAGS
 TYPICAL WORKFLOW
 
   $ gm init
-  $ gm add --type task --title "Build auth module"
-  # → {"ok":true,"data":{"id":"019...","status":"pending","operations":[...],...}}
-  $ gm commit 019...
-  # → {"ok":true,"data":{"id":"019...","status":"committed",...}}
-  $ gm ls node --type task
-  # → {"ok":true,"data":[{"id":"019...","type":"task","title":"Build auth module",...}]}
+  $ gm add --type event --title "Sprint planning" --who "team" --event-time "2025-01-15"
+  $ gm commit <proposal-id>
+  $ gm tag <node-id> "planning"
+  $ gm commit <proposal-id>
+  $ gm ln <node-id1> <node-id2> --type followed_by
+  $ gm commit <proposal-id>
+  $ gm ls node --type event
   $ gm cat <node-id>
-  # → {"ok":true,"data":{"id":"019...","type":"task","title":"Build auth module",...}}
-
-  To discard instead of applying:
-  $ gm reject 019...
-  # → {"ok":true,"data":{"id":"019...","status":"rejected",...}}
-
-STDIN PIPELINE
-
-  The add command accepts JSON from stdin instead of flags:
-
-  $ echo '{"type":"task","title":"Fix bug #42"}' | gm add
 
 Use "gm <command> --help" for detailed usage, examples, and output samples.`,
 	PersistentPostRunE: func(_ *cobra.Command, _ []string) error {

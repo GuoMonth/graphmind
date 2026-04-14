@@ -15,12 +15,15 @@ var (
 	addTitle       string
 	addDescription string
 	addStatus      string
+	addWho         string
+	addWhere       string
+	addEventTime   string
 )
 
 var addCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Create a node → proposal",
-	Long: `Create a new node in the project graph. Returns a pending proposal.
+	Long: `Create a new node in the graph. Returns a pending proposal.
 
 The node is NOT created immediately. A proposal is returned with status
 "pending". Call "gm commit <proposal-id>" to apply it.
@@ -28,50 +31,31 @@ The node is NOT created immediately. A proposal is returned with status
 Accepts input via flags OR via JSON on stdin (stdin takes priority).
 
 FLAGS
-  --type         Node type (required). One of: task, epic, decision, risk, release, discussion
+  --type         Node type (required). Open string — common types: event, person, place
   --title        Node title (required)
   --description  Optional description text
   --status       Optional initial status string
+  --who          Who was involved (free-form)
+  --where        Where it happened (free-form)
+  --event-time   When it happened (free-form: "2024年夏天", "last Tuesday", ISO 8601)
 
 STDIN FORMAT
   When piping JSON, provide a single object with the same field names:
-  {"type":"task","title":"My task","description":"...","status":"open"}`,
+  {"type":"event","title":"Team lunch","who":"Alice, Bob","event_time":"2025-01-15"}`,
 	Example: `  # Create via flags
-  gm add --type task --title "Build auth module"
-
-  # Create via flags with all fields
-  gm add --type epic --title "Q3 Roadmap" --description "All Q3 deliverables" --status "active"
+  gm add --type event --title "Team lunch" --who "Alice" --event-time "last Friday"
 
   # Create via stdin (useful for AI-generated content)
-  echo '{"type":"task","title":"Fix bug #42","description":"NPE in login flow"}' | gm add
-
-  # Output (proposal with status "pending"):
-  # {
-  #   "ok": true,
-  #   "data": {
-  #     "id": "019...",
-  #     "status": "pending",
-  #     "operations": [
-  #       {
-  #         "action": "create_node",
-  #         "entity": "node",
-  #         "data": {"type":"task","title":"Build auth module","description":"","status":""},
-  #         "summary": "task: Build auth module"
-  #       }
-  #     ],
-  #     "created_at": "2025-01-15T10:30:00.000Z",
-  #     "updated_at": "2025-01-15T10:30:00.000Z"
-  #   }
-  # }
-
-  # Error — missing type:
-  # {"ok":false,"error":{"code":"INVALID_INPUT","message":"invalid input: node type required"}}`,
+  echo '{"type":"event","title":"Sprint planning","who":"team","where":"Room A"}' | gm add`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		data := map[string]any{ // proposal operation data uses any
 			"type":        addType,
 			"title":       addTitle,
 			"description": addDescription,
 			"status":      addStatus,
+			"who":         addWho,
+			"where":       addWhere,
+			"event_time":  addEventTime,
 		}
 
 		// If stdin has data, use it instead of flags
@@ -91,10 +75,10 @@ STDIN FORMAT
 		}
 
 		nodeType, _ := data["type"].(string)
-		if !model.IsValidNodeType(nodeType) {
+		if nodeType == "" {
 			return model.WithHint(
-				fmt.Errorf("%w: invalid node type %q", model.ErrInvalidInput, nodeType),
-				fmt.Sprintf("Valid node types: %v. Example: gm add --type task --title \"...\"", model.AllNodeTypes()),
+				fmt.Errorf("%w: type is required", model.ErrInvalidInput),
+				"Provide --type <type>. Common types: event, person, place. Example: gm add --type event --title \"...\"",
 			)
 		}
 
@@ -124,4 +108,7 @@ func init() {
 	addCmd.Flags().StringVar(&addTitle, "title", "", "Node title (required unless piped via stdin)")
 	addCmd.Flags().StringVar(&addDescription, "description", "", "Node description")
 	addCmd.Flags().StringVar(&addStatus, "status", "", "Initial status")
+	addCmd.Flags().StringVar(&addWho, "who", "", "Who was involved")
+	addCmd.Flags().StringVar(&addWhere, "where", "", "Where it happened")
+	addCmd.Flags().StringVar(&addEventTime, "event-time", "", "When it happened (free-form)")
 }

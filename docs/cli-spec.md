@@ -189,7 +189,7 @@ Returns: all commands, parameters, input/output schemas, type registries.
 List entities with filters.
 
 ```
-gm ls [node|edge|tag|proposal] [flags]
+gm ls [node|edge|tag|tag_edge|proposal] [flags]
 ```
 
 Entity defaults to `node` when omitted.
@@ -208,6 +208,8 @@ gm ls                          # list nodes (default)
 gm ls node --type event        # list event nodes
 gm ls edge --type caused_by    # list causal edges
 gm ls tag                      # list all tags
+gm ls tag_edge                 # list tag-to-tag edges
+gm ls tag_edge --type parent_of  # list hierarchical tag relationships
 gm ls proposal --status pending  # list pending proposals
 ```
 
@@ -392,7 +394,9 @@ echo '{"type":"thought","title":"Consider switching to Rust","description":"..."
 
 ### gm ln <from-id> <to-id>
 
-Create a directed edge between two nodes. Returns a pending proposal.
+Create a directed edge between two entities. Returns a pending proposal.
+
+Auto-detects whether the IDs belong to nodes or tags. Both IDs must be the same entity type (both nodes or both tags).
 
 ```
 gm ln <from-id> <to-id> --type <edge-type>
@@ -400,12 +404,20 @@ gm ln <from-id> <to-id> --type <edge-type>
 
 | Flag | Description |
 |---|---|
-| `--type <type>` | Edge type (required) |
+| `--type <type>` | Edge type — open string (required) |
 | `--property <key=value>` | Set a property (repeatable) |
 
+**Node edges** (event-to-event relationships):
 ```bash
 gm ln 019abc-... 019def-... --type caused_by
 gm ln 019abc-... 019def-... --type followed_by --property "confidence=high"
+```
+
+**Tag edges** (concept-to-concept relationships):
+```bash
+gm ln <tag-id> <tag-id> --type parent_of
+gm ln <tag-id> <tag-id> --type synonym_of
+gm ln <tag-id> <tag-id> --type related_to
 ```
 
 ---
@@ -626,7 +638,7 @@ Node types and edge types are **open strings** — not enumerated, not validated
 | `observation` | Something noticed or perceived |
 | `decision` | A decision made or to be made |
 
-### Edge type examples (not exhaustive)
+### Edge type examples — node edges (not exhaustive)
 
 | Type | Use when |
 |---|---|
@@ -637,5 +649,14 @@ Node types and edge types are **open strings** — not enumerated, not validated
 | `reminded_by` | A reminded someone of B |
 | `contradicts` | A conflicts with B |
 | `supersedes` | A replaces B |
+
+### Edge type examples — tag edges (not exhaustive)
+
+| Type | Use when |
+|---|---|
+| `parent_of` | A is a broader concept than B (hierarchy) |
+| `synonym_of` | A and B are the same concept, different names |
+| `related_to` | A and B are conceptually related |
+| `opposite_of` | A and B are opposing concepts |
 
 The AI agent is free to invent new types as needed. Consistency is encouraged through `next_steps` hints, not enforced through validation.

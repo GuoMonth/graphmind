@@ -14,6 +14,7 @@ The `gm` CLI is consumed by AI agents. **One concept = one word, everywhere.** C
 |---|---|
 | `node` | A vertex in the graph — an event, person, place, or any recorded entity |
 | `edge` | A directed relationship between two nodes (causal, temporal, associative) |
+| `tag_edge` | A directed relationship between two tags (hierarchical, synonym, conceptual) |
 | `tag` | An AI-constructed semantic label for thematic clustering |
 | `proposal` | A staged batch of changes awaiting confirmation |
 | `event` | An immutable record of a past mutation (system concept, distinct from user-facing "event" node type) |

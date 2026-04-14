@@ -124,10 +124,32 @@ Complementary, not competing. Tags enable cheap discovery. Edges enable precise 
 4. **Enrichment** — tag descriptions evolve, becoming living context
 5. **Maintenance** — merge synonyms, split overloaded tags, retire orphans (all via proposals)
 
+### Tag-to-tag edges
+
+Tags can also have graph relationships with each other. While event edges express structural relationships between specific events (causal, temporal), tag edges express **conceptual relationships** between abstract concepts.
+
+**Construction basis — how the AI decides to create tag edges:**
+
+| Signal | Relationship type | Example |
+|---|---|---|
+| Tag names/descriptions share semantic meaning | `synonym_of` | "AI" synonym_of "人工智能" |
+| One tag's events are a subset of another's | `parent_of` | "亚洲美食" parent_of "泰国菜" |
+| Two tags frequently co-occur on the same events | `related_to` | "创业" related_to "融资" |
+| Two tags represent opposing concepts | `opposite_of` | "乐观" opposite_of "悲观" |
+
+**Key differences from event edges:**
+
+| | Event Edge | Tag Edge |
+|---|---|---|
+| Connects | Concrete events ↔ events | Abstract concepts ↔ concepts |
+| Basis | Event content (causal, temporal, relational) | Semantic analysis + co-occurrence patterns |
+| Timing | When events are created/updated | When tags accumulate or during periodic review |
+
+**Default behavior:** Tags have no edges by default. The AI agent explicitly creates tag edges via `gm ln <tag-id> <tag-id>` when it detects conceptual relationships. The same proposal-first workflow applies.
+
 ### Design decisions
 
-- **Flat, not hierarchical** — hierarchies impose a single classification axis; real life has overlapping dimensions
-- **Future: tag-to-tag edges** — planned support for tag relationships (parent/child, synonym, related)
+- **Flat, not hierarchical** — hierarchies impose a single classification axis; real life has overlapping dimensions. Tag edges allow optional hierarchical relationships without forcing them
 - **Separate table, not JSON properties** — indexed queries, FTS5 integration, event-sourced, cross-node JOINs
 - **Junction table has no metadata** — event log provides full history
 - **2-5 tags per event** — fewer loses signal, more creates noise

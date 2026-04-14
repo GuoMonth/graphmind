@@ -4,13 +4,16 @@ import (
 	"time"
 )
 
-// Node represents a vertex in the project graph.
+// Node represents a vertex in the graph — an event, person, place, or any recorded entity.
 type Node struct {
 	ID          string         `json:"id"`
 	Type        string         `json:"type"`
 	Title       string         `json:"title"`
 	Description string         `json:"description"`
 	Status      string         `json:"status"`
+	Who         string         `json:"who,omitempty"`
+	Where       string         `json:"where,omitempty"`
+	EventTime   string         `json:"event_time,omitempty"`
 	Properties  map[string]any `json:"properties"` // JSON flexible properties
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
@@ -67,4 +70,15 @@ type ProposalOperation struct {
 type NodeTag struct {
 	NodeID string `json:"node_id"`
 	TagID  string `json:"tag_id"`
+}
+
+// TagEdge represents a directed relationship between two tags.
+type TagEdge struct {
+	ID         string         `json:"id"`
+	Type       string         `json:"type"`
+	FromID     string         `json:"from_id"`
+	ToID       string         `json:"to_id"`
+	Properties map[string]any `json:"properties"` // JSON flexible properties
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
 }
