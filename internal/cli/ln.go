@@ -24,9 +24,9 @@ The edge is NOT created immediately. A proposal is returned with status
 "pending". Call "gm commit <proposal-id>" to apply it.
 
 CYCLE DETECTION
-  Node edges are checked for same-type cycles using a recursive
-  traversal. If adding the edge would form a cycle of the same edge type,
-  the command fails with exit code 3 (CONFLICT).`,
+  Both node edges and tag edges are checked for same-type cycles using a
+  recursive traversal. If adding the edge would form a cycle of the same
+  edge type, the command fails with exit code 3 (CONFLICT).`,
 	Example: `  # Create a node edge (auto-detected)
   gm ln 019abc... 019def... --type caused_by
 
@@ -94,15 +94,29 @@ CYCLE DETECTION
 				"Use 'gm tag <node-id> <tag-name>' to associate a tag with a node, or ensure both IDs are nodes or both are tags.",
 			)
 		default:
-			// Neither found — return the most useful error
-			if !fromIsNode && !fromIsTag && errors.Is(fromNodeErr, model.ErrNotFound) {
+			// Surface non-ErrNotFound errors (e.g. database errors)
+			for _, pair := range [][2]any{ // error pairs require any
+				{fromNodeErr, "from_id as node"},
+				{fromTagErr, "from_id as tag"},
+				{toNodeErr, "to_id as node"},
+				{toTagErr, "to_id as tag"},
+			} {
+				if e, _ := pair[0].(error); e != nil && !errors.Is(e, model.ErrNotFound) {
+					return fmt.Errorf("checking %s: %w", pair[1], e)
+				}
+			}
+
+			// All are ErrNotFound — report the most useful one
+			if !fromIsNode && !fromIsTag {
 				return model.WithHint(
-					fmt.Errorf("%w: entity %s not found", model.ErrNotFound, fromID),
+					fmt.Errorf("%w: entity %s not found",
+						model.ErrNotFound, fromID),
 					"Use 'gm ls node' or 'gm ls tag' to find valid IDs.",
 				)
 			}
 			return model.WithHint(
-				fmt.Errorf("%w: entity %s not found", model.ErrNotFound, toID),
+				fmt.Errorf("%w: entity %s not found",
+					model.ErrNotFound, toID),
 				"Use 'gm ls node' or 'gm ls tag' to find valid IDs.",
 			)
 		}

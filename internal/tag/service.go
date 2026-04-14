@@ -293,6 +293,11 @@ func (s *Service) CreateTagEdge(ctx context.Context, tx *sql.Tx, input CreateTag
 		)
 	}
 
+	// Same-type cycle detection
+	if err := s.detectTagCycle(ctx, tx, input.Type, input.FromID, input.ToID); err != nil {
+		return nil, err
+	}
+
 	id, err := uuid.NewV7()
 	if err != nil {
 		return nil, fmt.Errorf("generate tag edge id: %w", err)
@@ -443,4 +448,36 @@ func (s *Service) ListTagEdges(ctx context.Context, f ListTagEdgesFilter) ([]mod
 	}
 
 	return tagEdges, rows.Err()
+}
+
+// detectTagCycle checks if adding from→to would create a same-type cycle.
+func (s *Service) detectTagCycle(
+	ctx context.Context, tx *sql.Tx, edgeType, fromID, toID string,
+) error {
+	var found int
+	err := tx.QueryRowContext(ctx, `
+		WITH RECURSIVE reachable(tag_id) AS (
+			SELECT ?
+			UNION
+			SELECT e.to_id FROM tag_edges e
+			JOIN reachable r ON e.from_id = r.tag_id
+			WHERE e.type = ?
+		)
+		SELECT COUNT(*) FROM reachable WHERE tag_id = ?
+	`, toID, edgeType, fromID).Scan(&found)
+	if err != nil {
+		return fmt.Errorf("tag cycle detection: %w", err)
+	}
+	if found > 0 {
+		return model.WithHint(
+			fmt.Errorf(
+				"%w: tag edge would create a cycle",
+				model.ErrConflict,
+			),
+			"A path already exists from the target tag back to the"+
+				" source via edges of this type."+
+				" Reverse the direction or use a different type.",
+		)
+	}
+	return nil
 }

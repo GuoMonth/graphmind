@@ -555,6 +555,89 @@ func TestGetTagEdgeNotFound(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Tag edge cycle detection
+// ---------------------------------------------------------------------------
+
+func TestTagEdgeCycleDetection(t *testing.T) {
+	// A→B parent_of, then B→A parent_of should be rejected (cycle)
+	env := setup(t)
+	a := env.createTag(t, "ca")
+	b := env.createTag(t, "cb")
+
+	tx := env.beginTx(t)
+	_, err := env.tag.CreateTagEdge(env.ctx, tx, tag.CreateTagEdgeInput{
+		Type: "parent_of", FromID: a.ID, ToID: b.ID,
+	})
+	if err != nil {
+		tx.Rollback()
+		t.Fatalf("A→B: %v", err)
+	}
+	tx.Commit()
+
+	tx2 := env.beginTx(t)
+	defer tx2.Rollback()
+	_, err = env.tag.CreateTagEdge(env.ctx, tx2, tag.CreateTagEdgeInput{
+		Type: "parent_of", FromID: b.ID, ToID: a.ID,
+	})
+	if !errors.Is(err, model.ErrConflict) {
+		t.Errorf("B→A parent_of err = %v, want ErrConflict (cycle)", err)
+	}
+}
+
+func TestTagEdgeCycleTransitive(t *testing.T) {
+	// A→B→C parent_of, then C→A should be rejected (transitive cycle)
+	env := setup(t)
+	a := env.createTag(t, "ct1")
+	b := env.createTag(t, "ct2")
+	c := env.createTag(t, "ct3")
+
+	tx := env.beginTx(t)
+	env.tag.CreateTagEdge(env.ctx, tx, tag.CreateTagEdgeInput{
+		Type: "parent_of", FromID: a.ID, ToID: b.ID,
+	})
+	env.tag.CreateTagEdge(env.ctx, tx, tag.CreateTagEdgeInput{
+		Type: "parent_of", FromID: b.ID, ToID: c.ID,
+	})
+	tx.Commit()
+
+	tx2 := env.beginTx(t)
+	defer tx2.Rollback()
+	_, err := env.tag.CreateTagEdge(env.ctx, tx2, tag.CreateTagEdgeInput{
+		Type: "parent_of", FromID: c.ID, ToID: a.ID,
+	})
+	if !errors.Is(err, model.ErrConflict) {
+		t.Errorf("C→A parent_of err = %v, want ErrConflict (transitive cycle)", err)
+	}
+}
+
+func TestTagEdgeCycleDifferentTypeAllowed(t *testing.T) {
+	// A→B parent_of, then B→A synonym_of should succeed (different types)
+	env := setup(t)
+	a := env.createTag(t, "cd1")
+	b := env.createTag(t, "cd2")
+
+	tx := env.beginTx(t)
+	_, err := env.tag.CreateTagEdge(env.ctx, tx, tag.CreateTagEdgeInput{
+		Type: "parent_of", FromID: a.ID, ToID: b.ID,
+	})
+	if err != nil {
+		tx.Rollback()
+		t.Fatalf("A→B parent_of: %v", err)
+	}
+	tx.Commit()
+
+	tx2 := env.beginTx(t)
+	_, err = env.tag.CreateTagEdge(env.ctx, tx2, tag.CreateTagEdgeInput{
+		Type: "synonym_of", FromID: b.ID, ToID: a.ID,
+	})
+	if err != nil {
+		tx2.Rollback()
+		t.Fatalf("B→A synonym_of (different type, should succeed): %v", err)
+	}
+	tx2.Commit()
+}
+
 func TestDeleteTagEdge(t *testing.T) {
 	env := setup(t)
 	a := env.createTag(t, "da")
