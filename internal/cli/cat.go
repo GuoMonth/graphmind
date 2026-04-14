@@ -125,6 +125,23 @@ Use this to inspect any entity after listing with "gm ls".`,
 			return err
 		}
 
+		te, err := svc.tag.GetTagEdge(ctx, id)
+		if err == nil {
+			outputSuccess(te,
+				fmt.Sprintf("Retrieved %s tag edge (id: %s, from: %s → to: %s).",
+					te.Type, truncate(te.ID), truncate(te.FromID), truncate(te.ToID)),
+				[]string{
+					fmt.Sprintf("gm cat %s  — inspect the source tag", te.FromID),
+					fmt.Sprintf("gm cat %s  — inspect the target tag", te.ToID),
+					fmt.Sprintf("gm rm %s  — delete this tag edge", id),
+				},
+			)
+			return nil
+		}
+		if !errors.Is(err, model.ErrNotFound) {
+			return err
+		}
+
 		p, err := svc.proposal.Get(ctx, id)
 		if err == nil {
 			next := []string{
@@ -150,7 +167,7 @@ Use this to inspect any entity after listing with "gm ls".`,
 
 		return model.WithHint(
 			fmt.Errorf("%w: no entity with id %s", model.ErrNotFound, id),
-			"Use 'gm ls node', 'gm ls edge', 'gm ls tag', or 'gm ls proposal' to find valid IDs.",
+			"Use 'gm ls node', 'gm ls edge', 'gm ls tag', 'gm ls tag_edge', or 'gm ls proposal' to find valid IDs.",
 		)
 	},
 }

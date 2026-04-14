@@ -48,8 +48,8 @@ Used when AI agents call `gm` directly. Full response in one JSON object.
 One JSON object per line. Every object includes `id` and `entity` for downstream commands:
 
 ```
-{"id":"019abc...","entity":"node","type":"task","title":"Fix login"}
-{"id":"019def...","entity":"node","type":"task","title":"Fix signup"}
+{"id":"019abc...","entity":"node","type":"event","title":"Had dinner with David"}
+{"id":"019def...","entity":"node","type":"event","title":"Met Lisa at conference"}
 ```
 
 **Auto-detection**: if stdout is a pipe, use JSONL. Override with `--envelope` or `--jsonl`.
@@ -138,19 +138,19 @@ Commands compose via `|` pipes. **Read commands filter, write commands batch.**
 ### Pipeline examples
 
 ```bash
-# Find tasks about payments and show their dependency tree
-gm ls node --type task | gm grep "payment" | gm tree --depth 2
+# Find events about travel and show their relationship tree
+gm ls node --type event | gm grep "travel" | gm tree --depth 2
 
-# Tag all tasks matching a pattern
-gm ls node --type task | gm grep "billing" | gm tag --name "payment"
+# Tag all events matching a pattern
+gm ls node | gm grep "Bangkok" | gm tag --name "thailand-trip"
 gm commit <proposal-id>
 
-# Delete all deprecated nodes
-gm grep "deprecated" | gm rm
+# Delete all archived events
+gm grep "archived" | gm rm
 gm commit <proposal-id>
 
-# Show event log for nodes in a specific tag
-gm find --tag "api" | gm log
+# Show event log for nodes with a specific tag
+gm find --tag "startup-idea" | gm log
 
 # List orphan tags (0 associated nodes)
 gm ls tag --orphan
@@ -189,7 +189,7 @@ Returns: all commands, parameters, input/output schemas, type registries.
 List entities with filters.
 
 ```
-gm ls [node|edge|tag|proposal] [flags]
+gm ls [node|edge|tag|tag_edge|proposal] [flags]
 ```
 
 Entity defaults to `node` when omitted.
@@ -205,9 +205,11 @@ Entity defaults to `node` when omitted.
 
 ```bash
 gm ls                          # list nodes (default)
-gm ls node --type task         # list task nodes
-gm ls edge --type depends_on   # list dependency edges
+gm ls node --type event        # list event nodes
+gm ls edge --type caused_by    # list causal edges
 gm ls tag                      # list all tags
+gm ls tag_edge                 # list tag-to-tag edges
+gm ls tag_edge --type parent_of  # list hierarchical tag relationships
 gm ls proposal --status pending  # list pending proposals
 ```
 
@@ -280,9 +282,9 @@ Combines tag matching, type filtering, and neighborhood expansion in one call.
 Primary AI agent pattern: find anchor nodes, load surrounding context.
 
 ```bash
-gm find --tag "payment" --type task --expand 2
-gm find --tag "api" --tag "auth" --expand 1    # nodes with both tags
-gm find --text "deadline" --status open
+gm find --tag "thailand-trip" --type event --expand 2
+gm find --tag "startup-idea" --tag "David" --expand 1    # nodes with both tags
+gm find --text "conference" --status ongoing
 ```
 
 ---
@@ -303,8 +305,8 @@ gm tree <id> [flags]
 
 ```bash
 gm tree 019abc-...                              # default tree
-gm tree 019abc-... --type depends_on --depth 5  # dependency chain
-gm tree 019abc-... --direction incoming          # what depends on this?
+gm tree 019abc-... --type caused_by --depth 5   # causal chain
+gm tree 019abc-... --direction incoming          # what caused this?
 ```
 
 ---
@@ -347,7 +349,7 @@ Without arguments: total counts (nodes by type, edges by type, tags, events). Wi
 
 ### gm add
 
-Create a node. Returns a pending proposal.
+Create an event node. Returns a pending proposal.
 
 ```
 echo '<json>' | gm add
@@ -358,9 +360,12 @@ Input via stdin JSON (complex) or flags (simple):
 
 | Flag | Description |
 |---|---|
-| `--type <type>` | Node type (required) |
-| `--title <title>` | Node title (required) |
-| `--description <text>` | Node description |
+| `--type <type>` | Node type — open string, AI decides (required) |
+| `--title <title>` | Brief summary (required) |
+| `--description <text>` | Full narrative |
+| `--who <text>` | People involved |
+| `--where <text>` | Location |
+| `--event-time <text>` | When it happened (free-form: "2026-04-12", "last Tuesday", "summer 2025") |
 | `--status <status>` | Initial status |
 | `--property <key=value>` | Set a property (repeatable) |
 
@@ -368,26 +373,30 @@ Stdin JSON format:
 
 ```json
 {
-  "type": "task",
-  "title": "Fix login bug",
-  "description": "Users report 500 error on login",
-  "status": "open",
-  "properties": {"priority": "high", "estimate": "2h"}
+  "type": "event",
+  "title": "Had dinner with David",
+  "description": "Met at the Thai restaurant near the office, discussed the startup idea",
+  "who": "David, Lisa",
+  "where": "Bangkok Kitchen, 3rd Ave",
+  "event_time": "2026-04-12",
+  "properties": {"mood": "happy", "importance": "high"}
 }
 ```
 
 Returns: proposal object with proposal ID and one `create_node` operation.
 
 ```bash
-gm add --type task --title "Fix login bug"
-echo '{"type":"decision","title":"Choose database","description":"..."}' | gm add
+gm add --type event --title "Had dinner with David" --who "David" --where "Bangkok Kitchen"
+echo '{"type":"thought","title":"Consider switching to Rust","description":"..."}' | gm add
 ```
 
 ---
 
 ### gm ln <from-id> <to-id>
 
-Create a directed edge between two nodes. Returns a pending proposal.
+Create a directed edge between two entities. Returns a pending proposal.
+
+Auto-detects whether the IDs belong to nodes or tags. Both IDs must be the same entity type (both nodes or both tags).
 
 ```
 gm ln <from-id> <to-id> --type <edge-type>
@@ -395,12 +404,20 @@ gm ln <from-id> <to-id> --type <edge-type>
 
 | Flag | Description |
 |---|---|
-| `--type <type>` | Edge type (required) |
+| `--type <type>` | Edge type — open string (required) |
 | `--property <key=value>` | Set a property (repeatable) |
 
+**Node edges** (event-to-event relationships):
 ```bash
-gm ln 019abc-... 019def-... --type depends_on
-gm ln 019abc-... 019def-... --type blocks --property "reason=waiting on API"
+gm ln 019abc-... 019def-... --type caused_by
+gm ln 019abc-... 019def-... --type followed_by --property "confidence=high"
+```
+
+**Tag edges** (concept-to-concept relationships):
+```bash
+gm ln <tag-id> <tag-id> --type parent_of
+gm ln <tag-id> <tag-id> --type synonym_of
+gm ln <tag-id> <tag-id> --type related_to
 ```
 
 ---
@@ -441,7 +458,7 @@ gm untag <node-id> <tag-name>
 
 ### gm mv <id>
 
-Update an entity's properties. Returns a pending proposal.
+Update a node's fields. Returns a pending proposal.
 
 ```
 echo '<json>' | gm mv <id>
@@ -452,6 +469,9 @@ gm mv <id> [flags]
 |---|---|
 | `--title <title>` | New title |
 | `--description <text>` | New description |
+| `--who <text>` | New people involved |
+| `--where <text>` | New location |
+| `--event-time <text>` | New event time (free-form) |
 | `--status <status>` | New status |
 | `--type <type>` | New type |
 | `--property <key=value>` | Set a property (repeatable) |
@@ -459,9 +479,9 @@ gm mv <id> [flags]
 Stdin JSON: partial object — only provided fields are updated.
 
 ```bash
-gm mv 019abc-... --status done
-gm mv 019abc-... --title "Renamed task" --property "priority=low"
-echo '{"status":"done","properties":{"completed_at":"2026-04-13"}}' | gm mv 019abc-...
+gm mv 019abc-... --status resolved
+gm mv 019abc-... --who "David, Lisa, James" --where "Office"
+echo '{"event_time":"2026-04-14","properties":{"follow_up":"true"}}' | gm mv 019abc-...
 ```
 
 ---
@@ -500,11 +520,11 @@ Within a batch, operations can reference entities created by earlier operations 
 
 ```json
 [
-  {"command": "add", "data": {"type": "task", "title": "Design API"}},
-  {"command": "add", "data": {"type": "task", "title": "Implement API"}},
-  {"command": "ln", "data": {"type": "depends_on", "from_reference": 1, "to_reference": 0}},
-  {"command": "tag", "data": {"reference": 0, "tag_name": "api"}},
-  {"command": "tag", "data": {"reference": 1, "tag_name": "api"}}
+  {"command": "add", "data": {"type": "event", "title": "Met David at conference", "who": "David", "where": "Tech Summit 2026"}},
+  {"command": "add", "data": {"type": "person", "title": "David Chen", "description": "Startup founder, met at conference"}},
+  {"command": "ln", "data": {"type": "involves", "from_reference": 0, "to_reference": 1}},
+  {"command": "tag", "data": {"reference": 0, "tag_name": "networking"}},
+  {"command": "tag", "data": {"reference": 1, "tag_name": "networking"}}
 ]
 ```
 
@@ -582,7 +602,7 @@ A write command's response includes the proposal ID and a summary of operations:
     "proposal_id": "019abc-...",
     "status": "pending",
     "operations": [
-      {"action": "create_node", "entity": "node", "summary": "task: Fix login bug"}
+      {"action": "create_node", "entity": "node", "summary": "event: Had dinner with David"}
     ]
   }
 }
@@ -602,28 +622,41 @@ A write command's response includes the proposal ID and a summary of operations:
 
 ---
 
-## Type Registries
+## Open Type System
 
-### Node types
+Node types and edge types are **open strings** — not enumerated, not validated. The AI agent decides what types to use based on context.
 
-| Type | Semantics |
+### Node type examples (not exhaustive)
+
+| Type | Use when |
 |---|---|
-| `task` | A unit of work |
-| `epic` | A large body of work decomposed into tasks |
+| `event` | Something that happened ("Had dinner with David") |
+| `person` | A person who appears in events ("David Chen") |
+| `place` | A location that recurs ("Bangkok Kitchen") |
+| `thought` | An idea, reflection, or realization |
+| `meeting` | A scheduled gathering |
+| `observation` | Something noticed or perceived |
 | `decision` | A decision made or to be made |
-| `risk` | An identified risk or concern |
-| `release` | A release or milestone |
-| `discussion` | An ongoing discussion or open question |
 
-### Edge types
+### Edge type examples — node edges (not exhaustive)
 
-| Type | Semantics |
+| Type | Use when |
 |---|---|
-| `depends_on` | A cannot start until B is done |
-| `blocks` | A is preventing B from progressing |
-| `decompose` | A is broken down into B |
 | `caused_by` | A was caused by B |
+| `followed_by` | A happened after B (temporal chain) |
 | `related_to` | Weak link between A and B |
+| `involves` | A involves person/place B |
+| `reminded_by` | A reminded someone of B |
+| `contradicts` | A conflicts with B |
 | `supersedes` | A replaces B |
 
-Both registries are extensible.
+### Edge type examples — tag edges (not exhaustive)
+
+| Type | Use when |
+|---|---|
+| `parent_of` | A is a broader concept than B (hierarchy) |
+| `synonym_of` | A and B are the same concept, different names |
+| `related_to` | A and B are conceptually related |
+| `opposite_of` | A and B are opposing concepts |
+
+The AI agent is free to invent new types as needed. Consistency is encouraged through `next_steps` hints, not enforced through validation.

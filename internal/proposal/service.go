@@ -180,6 +180,8 @@ func (s *Service) applyOperation(
 		return s.applyCreateNode(ctx, tx, op.Data)
 	case model.OpCreateEdge:
 		return s.applyCreateEdge(ctx, tx, op.Data, createdIDs)
+	case model.OpCreateTagEdge:
+		return s.applyCreateTagEdge(ctx, tx, op.Data)
 	case model.OpTagNode:
 		return s.applyTagNode(ctx, tx, op.Data, createdIDs)
 	case model.OpUpdateNode:
@@ -188,6 +190,8 @@ func (s *Service) applyOperation(
 		return s.applyDeleteNode(ctx, tx, op.Data, createdIDs)
 	case model.OpDeleteEdge:
 		return s.applyDeleteEdge(ctx, tx, op.Data, createdIDs)
+	case model.OpDeleteTagEdge:
+		return s.applyDeleteTagEdge(ctx, tx, op.Data)
 	default:
 		return "", fmt.Errorf("%w: unknown operation action %q", model.ErrInvalidInput, op.Action)
 	}
@@ -199,6 +203,9 @@ func (s *Service) applyCreateNode(ctx context.Context, tx *sql.Tx, data map[stri
 		Title:       getString(data, "title"),
 		Description: getString(data, "description"),
 		Status:      getString(data, "status"),
+		Who:         getString(data, "who"),
+		Where:       getString(data, "where"),
+		EventTime:   getString(data, "event_time"),
 	}
 	if props, ok := data["properties"]; ok {
 		if m, ok := props.(map[string]any); ok { // JSON properties require any
@@ -206,7 +213,7 @@ func (s *Service) applyCreateNode(ctx context.Context, tx *sql.Tx, data map[stri
 		}
 	}
 
-	node, err := s.graph.CreateNode(ctx, tx, input)
+	node, err := s.graph.CreateNode(ctx, tx, &input)
 	if err != nil {
 		return "", err
 	}
@@ -289,10 +296,13 @@ func (s *Service) applyUpdateNode(
 	}
 
 	input := graph.UpdateNodeInput{
-		ID:     id,
-		Type:   getString(data, "type"),
-		Title:  getString(data, "title"),
-		Status: getString(data, "status"),
+		ID:        id,
+		Type:      getString(data, "type"),
+		Title:     getString(data, "title"),
+		Status:    getString(data, "status"),
+		Who:       getString(data, "who"),
+		Where:     getString(data, "where"),
+		EventTime: getString(data, "event_time"),
 	}
 	if v, ok := data["description"]; ok {
 		if s, ok := v.(string); ok {
@@ -343,6 +353,33 @@ func (s *Service) applyDeleteEdge(
 	}
 
 	if err := s.graph.DeleteEdge(ctx, tx, id); err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
+func (s *Service) applyCreateTagEdge(ctx context.Context, tx *sql.Tx, data map[string]any) (string, error) {
+	input := tag.CreateTagEdgeInput{
+		Type:   getString(data, "type"),
+		FromID: getString(data, "from_id"),
+		ToID:   getString(data, "to_id"),
+	}
+	if props, ok := data["properties"]; ok {
+		if m, ok := props.(map[string]any); ok { // JSON properties require any
+			input.Properties = m
+		}
+	}
+
+	edge, err := s.tag.CreateTagEdge(ctx, tx, input)
+	if err != nil {
+		return "", err
+	}
+	return edge.ID, nil
+}
+
+func (s *Service) applyDeleteTagEdge(ctx context.Context, tx *sql.Tx, data map[string]any) (string, error) {
+	id := getString(data, "id")
+	if err := s.tag.DeleteTagEdge(ctx, tx, id); err != nil {
 		return "", err
 	}
 	return id, nil

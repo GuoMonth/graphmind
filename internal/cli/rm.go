@@ -84,18 +84,23 @@ OUTPUT
 		ctx := cmd.Context()
 
 		for _, id := range ids {
-			// Auto-detect entity type: try node first, then edge
+			// Auto-detect entity type: try node, edge, then tag_edge
 			action := model.OpDeleteNode
 			entity := "node"
 			if _, err := svc.graph.GetNode(ctx, id); err != nil {
 				if _, err := svc.graph.GetEdge(ctx, id); err != nil {
-					return model.WithHint(
-						fmt.Errorf("%w: entity %s not found", model.ErrNotFound, id),
-						"Use 'gm ls node' or 'gm ls edge' to find valid IDs, or 'gm grep <keyword>' to search.",
-					)
+					if _, err := svc.tag.GetTagEdge(ctx, id); err != nil {
+						return model.WithHint(
+							fmt.Errorf("%w: entity %s not found", model.ErrNotFound, id),
+							"Use 'gm ls node', 'gm ls edge', or 'gm ls tag_edge' to find valid IDs, or 'gm grep <keyword>' to search.",
+						)
+					}
+					action = model.OpDeleteTagEdge
+					entity = "tag_edge"
+				} else {
+					action = model.OpDeleteEdge
+					entity = "edge"
 				}
-				action = model.OpDeleteEdge
-				entity = "edge"
 			}
 
 			ops = append(ops, model.ProposalOperation{

@@ -50,7 +50,7 @@ func TestMigrate(t *testing.T) {
 	}
 
 	// Verify core tables exist
-	tables := []string{"nodes", "edges", "tags", "node_tags", "events", "proposals", "schema_version"}
+	tables := []string{"nodes", "edges", "tags", "node_tags", "tag_edges", "events", "proposals", "schema_version"}
 	for _, tbl := range tables {
 		var name string
 		err := d.QueryRow(
@@ -66,13 +66,13 @@ func TestMigrate(t *testing.T) {
 		t.Fatalf("Migrate (idempotent): %v", err)
 	}
 
-	// Verify schema_version has exactly one entry
+	// Verify schema_version has entries for all migrations
 	var count int
 	if err := d.QueryRow("SELECT COUNT(*) FROM schema_version").Scan(&count); err != nil {
 		t.Fatalf("count schema_version: %v", err)
 	}
-	if count != 1 {
-		t.Errorf("schema_version rows = %d, want 1", count)
+	if count != 2 {
+		t.Errorf("schema_version rows = %d, want 2", count)
 	}
 }
 

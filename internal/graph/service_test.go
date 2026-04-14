@@ -46,7 +46,7 @@ func (e *testEnv) beginTx(t *testing.T) *sql.Tx {
 func (e *testEnv) createNode(t *testing.T, nodeType, title string) *model.Node {
 	t.Helper()
 	tx := e.beginTx(t)
-	n, err := e.graph.CreateNode(e.ctx, tx, graph.CreateNodeInput{
+	n, err := e.graph.CreateNode(e.ctx, tx, &graph.CreateNodeInput{
 		Type:  nodeType,
 		Title: title,
 	})
@@ -86,7 +86,7 @@ func TestCreateNodeWithProperties(t *testing.T) {
 	env := setup(t)
 	tx := env.beginTx(t)
 
-	n, err := env.graph.CreateNode(env.ctx, tx, graph.CreateNodeInput{
+	n, err := env.graph.CreateNode(env.ctx, tx, &graph.CreateNodeInput{
 		Type:        "task",
 		Title:       "With props",
 		Description: "desc",
@@ -115,17 +115,21 @@ func TestCreateNodeWithProperties(t *testing.T) {
 	}
 }
 
-func TestCreateNodeInvalidType(t *testing.T) {
+func TestCreateNodeOpenType(t *testing.T) {
+	// Open type system: any non-empty string is valid
 	env := setup(t)
 	tx := env.beginTx(t)
 	defer tx.Rollback()
 
-	_, err := env.graph.CreateNode(env.ctx, tx, graph.CreateNodeInput{
-		Type:  "invalid_type",
-		Title: "Bad node",
+	node, err := env.graph.CreateNode(env.ctx, tx, &graph.CreateNodeInput{
+		Type:  "custom_type",
+		Title: "Custom type node",
 	})
-	if !errors.Is(err, model.ErrInvalidInput) {
-		t.Errorf("err = %v, want ErrInvalidInput", err)
+	if err != nil {
+		t.Fatalf("CreateNode with custom type: %v", err)
+	}
+	if node.Type != "custom_type" {
+		t.Errorf("Type = %q, want %q", node.Type, "custom_type")
 	}
 }
 
@@ -134,7 +138,7 @@ func TestCreateNodeEmptyTitle(t *testing.T) {
 	tx := env.beginTx(t)
 	defer tx.Rollback()
 
-	_, err := env.graph.CreateNode(env.ctx, tx, graph.CreateNodeInput{
+	_, err := env.graph.CreateNode(env.ctx, tx, &graph.CreateNodeInput{
 		Type:  "task",
 		Title: "",
 	})
@@ -143,13 +147,14 @@ func TestCreateNodeEmptyTitle(t *testing.T) {
 	}
 }
 
-func TestCreateNodeAllTypes(t *testing.T) {
+func TestCreateNodeVariousTypes(t *testing.T) {
 	env := setup(t)
 
-	for _, nodeType := range model.AllNodeTypes() {
+	types := []string{"event", "person", "place", "concept", "task"}
+	for _, nodeType := range types {
 		t.Run(nodeType, func(t *testing.T) {
 			tx := env.beginTx(t)
-			_, err := env.graph.CreateNode(env.ctx, tx, graph.CreateNodeInput{
+			_, err := env.graph.CreateNode(env.ctx, tx, &graph.CreateNodeInput{
 				Type:  nodeType,
 				Title: "Test " + nodeType,
 			})
@@ -245,13 +250,14 @@ func TestCreateEdge(t *testing.T) {
 	}
 }
 
-func TestCreateEdgeAllTypes(t *testing.T) {
+func TestCreateEdgeVariousTypes(t *testing.T) {
 	env := setup(t)
 
-	for _, edgeType := range model.AllEdgeTypes() {
+	types := []string{"caused_by", "followed_by", "related_to", "involves", "supersedes"}
+	for _, edgeType := range types {
 		t.Run(edgeType, func(t *testing.T) {
-			a := env.createNode(t, "task", "From "+edgeType)
-			b := env.createNode(t, "task", "To "+edgeType)
+			a := env.createNode(t, "event", "From "+edgeType)
+			b := env.createNode(t, "event", "To "+edgeType)
 			tx := env.beginTx(t)
 			_, err := env.graph.CreateEdge(env.ctx, tx, graph.CreateEdgeInput{
 				Type:   edgeType,
@@ -267,21 +273,43 @@ func TestCreateEdgeAllTypes(t *testing.T) {
 	}
 }
 
-func TestCreateEdgeInvalidType(t *testing.T) {
+func TestCreateEdgeEmptyType(t *testing.T) {
 	env := setup(t)
-	a := env.createNode(t, "task", "A")
-	b := env.createNode(t, "task", "B")
+	a := env.createNode(t, "event", "A")
+	b := env.createNode(t, "event", "B")
 
 	tx := env.beginTx(t)
 	defer tx.Rollback()
 
 	_, err := env.graph.CreateEdge(env.ctx, tx, graph.CreateEdgeInput{
-		Type:   "invalid_edge",
+		Type:   "",
 		FromID: a.ID,
 		ToID:   b.ID,
 	})
 	if !errors.Is(err, model.ErrInvalidInput) {
 		t.Errorf("err = %v, want ErrInvalidInput", err)
+	}
+}
+
+func TestCreateEdgeOpenType(t *testing.T) {
+	// Open type system: any non-empty string is valid
+	env := setup(t)
+	a := env.createNode(t, "event", "A")
+	b := env.createNode(t, "event", "B")
+
+	tx := env.beginTx(t)
+	defer tx.Rollback()
+
+	edge, err := env.graph.CreateEdge(env.ctx, tx, graph.CreateEdgeInput{
+		Type:   "custom_edge_type",
+		FromID: a.ID,
+		ToID:   b.ID,
+	})
+	if err != nil {
+		t.Fatalf("CreateEdge with custom type: %v", err)
+	}
+	if edge.Type != "custom_edge_type" {
+		t.Errorf("Type = %q, want %q", edge.Type, "custom_edge_type")
 	}
 }
 
@@ -547,11 +575,12 @@ func TestCycleCrossTypesAreIndependent(t *testing.T) {
 	tx2.Commit()
 }
 
-func TestCycleRelatedToIsNotDirectional(t *testing.T) {
-	// related_to is NOT directional, so A→B then B→A should succeed (no cycle check)
+func TestCycleDetectionAlwaysOn(t *testing.T) {
+	// Open type system: ALL edge types get same-type cycle detection.
+	// A→B related_to then B→A related_to should be rejected as a cycle.
 	env := setup(t)
-	a := env.createNode(t, "task", "A")
-	b := env.createNode(t, "task", "B")
+	a := env.createNode(t, "event", "A")
+	b := env.createNode(t, "event", "B")
 
 	tx := env.beginTx(t)
 	_, err := env.graph.CreateEdge(env.ctx, tx, graph.CreateEdgeInput{
@@ -563,16 +592,26 @@ func TestCycleRelatedToIsNotDirectional(t *testing.T) {
 	}
 	tx.Commit()
 
-	// related_to is not in DirectionalEdgeTypes so reverse should succeed
+	// Reverse edge of same type should be rejected (cycle)
 	tx2 := env.beginTx(t)
 	_, err = env.graph.CreateEdge(env.ctx, tx2, graph.CreateEdgeInput{
 		Type: "related_to", FromID: b.ID, ToID: a.ID,
 	})
-	if err != nil {
-		tx2.Rollback()
-		t.Fatalf("B→A related_to (non-directional, should succeed): %v", err)
+	tx2.Rollback()
+	if !errors.Is(err, model.ErrConflict) {
+		t.Errorf("B→A related_to err = %v, want ErrConflict (cycle)", err)
 	}
-	tx2.Commit()
+
+	// Different type between same nodes should succeed (cycle is per-type)
+	tx3 := env.beginTx(t)
+	_, err = env.graph.CreateEdge(env.ctx, tx3, graph.CreateEdgeInput{
+		Type: "witnessed_by", FromID: b.ID, ToID: a.ID,
+	})
+	if err != nil {
+		tx3.Rollback()
+		t.Fatalf("B→A witnessed_by (different type, should succeed): %v", err)
+	}
+	tx3.Commit()
 }
 
 // ---------------------------------------------------------------------------
@@ -684,7 +723,7 @@ func TestUpdateNodeEmptyDescription(t *testing.T) {
 	env := setup(t)
 	// Create node with description
 	tx := env.beginTx(t)
-	n, err := env.graph.CreateNode(env.ctx, tx, graph.CreateNodeInput{
+	n, err := env.graph.CreateNode(env.ctx, tx, &graph.CreateNodeInput{
 		Type: "task", Title: "Desc clear", Description: "has desc",
 	})
 	if err != nil {
@@ -714,7 +753,7 @@ func TestUpdateNodeEmptyDescription(t *testing.T) {
 func TestUpdateNodeMergeProperties(t *testing.T) {
 	env := setup(t)
 	tx := env.beginTx(t)
-	n, err := env.graph.CreateNode(env.ctx, tx, graph.CreateNodeInput{
+	n, err := env.graph.CreateNode(env.ctx, tx, &graph.CreateNodeInput{
 		Type:       "task",
 		Title:      "Props merge",
 		Properties: map[string]any{"a": "1", "b": "2"}, // JSON properties
@@ -775,19 +814,23 @@ func TestUpdateNodeNotFound(t *testing.T) {
 	}
 }
 
-func TestUpdateNodeInvalidType(t *testing.T) {
+func TestUpdateNodeOpenType(t *testing.T) {
+	// Open type system: updating to any non-empty type should succeed
 	env := setup(t)
-	n := env.createNode(t, "task", "Bad type")
+	n := env.createNode(t, "event", "Change type")
 
 	tx := env.beginTx(t)
 	defer tx.Rollback()
 
-	_, err := env.graph.UpdateNode(env.ctx, tx, &graph.UpdateNodeInput{
+	updated, err := env.graph.UpdateNode(env.ctx, tx, &graph.UpdateNodeInput{
 		ID:   n.ID,
-		Type: "invalid_type",
+		Type: "person",
 	})
-	if !errors.Is(err, model.ErrInvalidInput) {
-		t.Errorf("err = %v, want ErrInvalidInput", err)
+	if err != nil {
+		t.Fatalf("UpdateNode to custom type: %v", err)
+	}
+	if updated.Type != "person" {
+		t.Errorf("Type = %q, want %q", updated.Type, "person")
 	}
 }
 
@@ -960,7 +1003,7 @@ func TestSearchNodesBasic(t *testing.T) {
 func TestSearchNodesDescription(t *testing.T) {
 	env := setup(t)
 	tx := env.beginTx(t)
-	env.graph.CreateNode(env.ctx, tx, graph.CreateNodeInput{
+	env.graph.CreateNode(env.ctx, tx, &graph.CreateNodeInput{
 		Type: "task", Title: "Generic title", Description: "handles payment logic",
 	})
 	tx.Commit()
