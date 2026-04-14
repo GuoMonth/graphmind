@@ -3,13 +3,14 @@
 package update
 
 import (
+	"context"
 	"io"
 	"os/exec"
 	"syscall"
 )
 
 func startDetachedProcess(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
+	cmd := exec.CommandContext(context.Background(), name, args...)
 	cmd.Stdin = nil
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard

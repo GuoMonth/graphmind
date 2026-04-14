@@ -32,7 +32,9 @@ func extractTarGzBinary(archive []byte, binaryName string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open tar.gz archive: %w", err)
 	}
-	defer gzr.Close()
+	defer func() {
+		_ = gzr.Close()
+	}()
 
 	tr := tar.NewReader(gzr)
 	var matches [][]byte

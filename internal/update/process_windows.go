@@ -3,6 +3,7 @@
 package update
 
 import (
+	"context"
 	"io"
 	"os/exec"
 	"syscall"
@@ -11,7 +12,7 @@ import (
 const createNewProcessGroup = 0x00000200
 
 func startDetachedProcess(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
+	cmd := exec.CommandContext(context.Background(), name, args...)
 	cmd.Stdin = nil
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard

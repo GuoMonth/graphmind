@@ -76,7 +76,7 @@ func TestMaybeNotifyAndCheckUsesCachedAvailability(t *testing.T) {
 	manager.currentVersion = "v1.0.0"
 	manager.now = func() time.Time { return time.Date(2026, 4, 14, 8, 0, 0, 0, time.UTC) }
 
-	if err := manager.saveState(State{
+	if err := manager.saveState(&State{
 		CheckedAt:       manager.now(),
 		CheckedVersion:  "v1.0.0",
 		LatestVersion:   "v1.1.0",
@@ -107,7 +107,7 @@ func TestMaybeNotifyAndCheckStartsBackgroundWhenStale(t *testing.T) {
 	now := time.Date(2026, 4, 14, 8, 0, 0, 0, time.UTC)
 	manager.now = func() time.Time { return now }
 
-	if err := manager.saveState(State{
+	if err := manager.saveState(&State{
 		CheckedAt:      now.Add(-25 * time.Hour),
 		CheckedVersion: "v1.0.0",
 		LatestVersion:  "v1.0.0",

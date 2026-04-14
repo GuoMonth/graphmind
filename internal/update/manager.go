@@ -76,9 +76,15 @@ func NewManager(currentVersion string) *Manager {
 func (m *Manager) MaybeNotifyAndCheck() {
 	state, err := m.loadState()
 	if err == nil && state.UpdateAvailable && state.CheckedVersion == m.currentVersion && state.LatestVersion != "" {
-		fmt.Fprintf(m.stderr, "gm update available: %s (current %s). Run %q to install.\n", state.LatestVersion, m.currentVersion, defaultInstallCommand)
+		_, _ = fmt.Fprintf(
+			m.stderr,
+			"gm update available: %s (current %s). Run %q to install.\n",
+			state.LatestVersion,
+			m.currentVersion,
+			defaultInstallCommand,
+		)
 	}
-	if !shouldAutoCheck(state, m.currentVersion, m.now()) {
+	if !shouldAutoCheck(&state, m.currentVersion, m.now()) {
 		return
 	}
 	_ = m.startBackgroundCheck()
@@ -100,7 +106,7 @@ func (m *Manager) Check(ctx context.Context, options CheckOptions) (CheckResult,
 
 	release, err := m.fetchLatestRelease(ctx)
 	if err != nil {
-		_ = m.saveState(State{
+		_ = m.saveState(&State{
 			CheckedAt:      m.now().UTC(),
 			CheckedVersion: m.currentVersion,
 			LastError:      err.Error(),
@@ -113,7 +119,7 @@ func (m *Manager) Check(ctx context.Context, options CheckOptions) (CheckResult,
 
 	asset, err := m.findAsset(release)
 	if err != nil {
-		_ = m.saveState(State{
+		_ = m.saveState(&State{
 			CheckedAt:      m.now().UTC(),
 			CheckedVersion: m.currentVersion,
 			LatestVersion:  release.TagName,
@@ -137,7 +143,7 @@ func (m *Manager) Check(ctx context.Context, options CheckOptions) (CheckResult,
 		InstallCommand:  defaultInstallCommand,
 		CheckedAt:       m.now().UTC(),
 	}
-	if err := m.saveState(State{
+	if err := m.saveState(&State{
 		CheckedAt:       result.CheckedAt,
 		CheckedVersion:  m.currentVersion,
 		LatestVersion:   result.LatestVersion,
@@ -199,7 +205,7 @@ func (m *Manager) Apply(ctx context.Context, targetVersion string) (ApplyResult,
 		ReleaseURL:       releaseURLFor(release),
 		TargetPath:       executablePath,
 	}
-	_ = m.saveState(State{
+	_ = m.saveState(&State{
 		CheckedAt:       m.now().UTC(),
 		CheckedVersion:  release.TagName,
 		LatestVersion:   release.TagName,
@@ -228,7 +234,7 @@ func (m *Manager) fetchReleaseByTag(ctx context.Context, tag string) (Release, e
 }
 
 func (m *Manager) getRelease(ctx context.Context, endpoint string) (Release, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
 		return Release{}, fmt.Errorf("create update request: %w", err)
 	}
@@ -267,7 +273,7 @@ func (m *Manager) findAsset(release Release) (Asset, error) {
 }
 
 func (m *Manager) downloadAsset(ctx context.Context, asset Asset) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, asset.BrowserDownloadURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, asset.BrowserDownloadURL, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("create asset request: %w", err)
 	}
@@ -313,7 +319,7 @@ func (m *Manager) loadState() (State, error) {
 	return state, nil
 }
 
-func (m *Manager) saveState(state State) error {
+func (m *Manager) saveState(state *State) error {
 	if err := os.MkdirAll(filepath.Dir(m.cachePath), 0o755); err != nil {
 		return fmt.Errorf("create update cache directory: %w", err)
 	}
@@ -331,7 +337,7 @@ func (m *Manager) saveState(state State) error {
 	return nil
 }
 
-func (m *Manager) tryAcquireLock() (func(), bool, error) {
+func (m *Manager) tryAcquireLock() (unlock func(), ok bool, err error) {
 	if err := os.MkdirAll(filepath.Dir(m.lockPath), 0o755); err != nil {
 		return nil, false, fmt.Errorf("create update lock directory: %w", err)
 	}
@@ -373,7 +379,10 @@ func (m *Manager) startBackgroundCheck() error {
 	return m.startProcess(executablePath, backgroundParentSubcmd, backgroundCheckSubcmd, backgroundCheckFlag)
 }
 
-func shouldAutoCheck(state State, currentVersion string, now time.Time) bool {
+func shouldAutoCheck(state *State, currentVersion string, now time.Time) bool {
+	if state == nil {
+		return true
+	}
 	if state.CheckedAt.IsZero() {
 		return true
 	}
