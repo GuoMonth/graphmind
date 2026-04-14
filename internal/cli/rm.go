@@ -111,7 +111,11 @@ OUTPUT
 			return err
 		}
 
-		output(p)
+		outputSuccess(p,
+			fmt.Sprintf("Created pending proposal %s: delete %d %s.",
+				truncate(p.ID), len(ops), pluralize("entity", "entities", len(ops))),
+			proposalNextSteps(p.ID),
+		)
 		return nil
 	},
 }

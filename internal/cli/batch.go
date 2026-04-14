@@ -107,7 +107,11 @@ OUTPUT
 			return err
 		}
 
-		output(p)
+		outputSuccess(p,
+			fmt.Sprintf("Created pending proposal %s with %d %s.",
+				truncate(p.ID), len(ops), pluralize("operation", "operations", len(ops))),
+			proposalNextSteps(p.ID),
+		)
 		return nil
 	},
 }

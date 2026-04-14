@@ -35,10 +35,17 @@ Safe to run multiple times — migrations are idempotent.`,
 			return fmt.Errorf("run migrations: %w", err)
 		}
 
-		output(map[string]string{
-			"status":  "initialized",
-			"db_path": dbPath,
-		})
+		outputSuccess(
+			map[string]string{
+				"status":  "initialized",
+				"db_path": dbPath,
+			},
+			fmt.Sprintf("Database initialized at %s.", dbPath),
+			[]string{
+				"gm add --type task --title \"...\"  — create your first node",
+				"gm --help  — see all available commands",
+			},
+		)
 		return nil
 	},
 }

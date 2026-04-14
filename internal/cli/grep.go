@@ -85,7 +85,17 @@ OUTPUT
 			)
 		}
 
-		output(nodes)
+		summary := fmt.Sprintf("Found %d %s matching %q.",
+			len(nodes), pluralize("node", "nodes", len(nodes)), pattern)
+		next := []string{"gm cat <id>  — inspect a matching node"}
+		if len(nodes) > 0 {
+			next = append(next, "gm rm <id> [<id>...]  — delete matching nodes")
+		}
+		if len(nodes) == grepLimit {
+			next = append(next,
+				fmt.Sprintf("gm grep %q --limit %d --after %s  — next page", pattern, grepLimit, nodes[len(nodes)-1].ID))
+		}
+		outputSuccess(nodes, summary, next)
 		return nil
 	},
 }

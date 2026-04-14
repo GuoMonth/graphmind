@@ -94,7 +94,17 @@ OUTPUT
 			return err
 		}
 
-		output(events)
+		summary := fmt.Sprintf("Retrieved %d %s.", len(events), pluralize("event", "events", len(events)))
+		next := []string{
+			"gm cat <entity-id>  — inspect an entity referenced in events",
+			"gm log --entity-id <id>  — filter events for a specific entity",
+			"gm log --type <action> --since <duration>  — narrow by action and time window",
+		}
+		if len(events) == logLimit {
+			next = append(next,
+				fmt.Sprintf("gm log --limit %d --after %s  — next page", logLimit, events[len(events)-1].ID))
+		}
+		outputSuccess(events, summary, next)
 		return nil
 	},
 }

@@ -93,7 +93,11 @@ CYCLE DETECTION
 			return err
 		}
 
-		output(p)
+		outputSuccess(p,
+			fmt.Sprintf("Created pending proposal %s: create %s edge (%s → %s).",
+				truncate(p.ID), lnEdgeType, truncate(fromID), truncate(toID)),
+			proposalNextSteps(p.ID),
+		)
 		return nil
 	},
 }

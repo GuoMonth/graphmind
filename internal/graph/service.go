@@ -129,9 +129,9 @@ type UpdateNodeInput struct {
 
 // mergeProperties overlays incoming onto existing and returns the serialized JSON.
 func mergeProperties(existing, incoming map[string]any) ([]byte, error) { // JSON flexible properties
-	merged := existing
-	if merged == nil {
-		merged = map[string]any{} // JSON flexible properties
+	merged := make(map[string]any, len(existing)+len(incoming))
+	for k, v := range existing {
+		merged[k] = v
 	}
 	for k, v := range incoming {
 		merged[k] = v

@@ -123,7 +123,10 @@ OUTPUT
 			return err
 		}
 
-		output(p)
+		outputSuccess(p,
+			fmt.Sprintf("Created pending proposal %s: update node %s.", truncate(p.ID), truncate(id)),
+			proposalNextSteps(p.ID),
+		)
 		return nil
 	},
 }

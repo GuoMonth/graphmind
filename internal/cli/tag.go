@@ -68,7 +68,11 @@ is committed. If it already exists, the existing tag is reused.`,
 			return err
 		}
 
-		output(p)
+		outputSuccess(p,
+			fmt.Sprintf("Created pending proposal %s: tag node %s with %q.",
+				truncate(p.ID), truncate(nodeID), tagName),
+			proposalNextSteps(p.ID),
+		)
 		return nil
 	},
 }

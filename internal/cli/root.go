@@ -64,8 +64,8 @@ CORE CONCEPTS
   Output Format
     Every command writes exactly one JSON object to stdout:
 
-      Success:  {"ok":true,"data":<payload>}
-      Error:    {"ok":false,"error":{"code":"<CODE>","message":"<detail>"}}
+      Success:  {"ok":true,"data":<payload>,"summary":"...","next_steps":["..."]}
+      Error:    {"ok":false,"error":{"code":"<CODE>","message":"<detail>","hint":"<AI guidance>"}}
 
     Use --pretty for human-readable indented output.
     Use --quiet to suppress stdout entirely (exit code only).
@@ -208,13 +208,27 @@ func wireAndMigrate(ctx context.Context) error {
 	return db.Migrate(ctx, svc.db)
 }
 
-// output writes the JSON envelope to stdout.
-func output(data any) {
+// outputSuccess writes a JSON success envelope with summary and next-step guidance.
+func outputSuccess(data any, summary string, nextSteps []string) {
 	if quiet {
 		return
 	}
-	env := model.Envelope{OK: true, Data: data}
+	env := model.Envelope{
+		OK:        true,
+		Data:      data,
+		Summary:   summary,
+		NextSteps: nextSteps,
+	}
 	writeJSON(env)
+}
+
+// proposalNextSteps returns common next-step suggestions for write commands that produce proposals.
+func proposalNextSteps(proposalID string) []string {
+	return []string{
+		fmt.Sprintf("gm commit %s  — apply the changes to the graph", proposalID),
+		fmt.Sprintf("gm cat %s  — inspect proposal details before committing", proposalID),
+		fmt.Sprintf("gm reject %s  — discard this proposal", proposalID),
+	}
 }
 
 // outputError writes a JSON error envelope to stdout and returns the appropriate exit code.
@@ -257,6 +271,14 @@ func truncate(s string) string {
 		return s
 	}
 	return string(r[:n])
+}
+
+// pluralize returns singular when n == 1, plural otherwise.
+func pluralize(singular, plural string, n int) string {
+	if n == 1 {
+		return singular
+	}
+	return plural
 }
 
 func writeJSON(v any) {

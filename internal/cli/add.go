@@ -111,7 +111,10 @@ STDIN FORMAT
 			return err
 		}
 
-		output(p)
+		outputSuccess(p,
+			fmt.Sprintf("Created pending proposal %s: create %s node %q.", truncate(p.ID), nodeType, title),
+			proposalNextSteps(p.ID),
+		)
 		return nil
 	},
 }
