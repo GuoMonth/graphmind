@@ -87,6 +87,8 @@ All commands output JSON envelopes (`{"ok": true, "data": ...}`), making them co
 | Command | Description |
 |---------|-------------|
 | `gm init` | Initialize event graph database |
+| `gm update check` | Check GitHub Releases for a newer CLI version |
+| `gm update apply` | Download and install a newer CLI version |
 
 ### Proposal-First Writes
 
@@ -218,6 +220,20 @@ Download a pre-built binary from [Releases](https://github.com/GuoMonth/graphmin
 ```bash
 go install github.com/senguoyun-guosheng/graphmind/cmd/gm@latest
 ```
+
+## Updates
+
+GraphMind can check for newer releases published on GitHub:
+
+```bash
+gm update check
+gm update apply
+gm update apply --version v0.3.1
+```
+
+Normal `gm` commands may trigger a **non-blocking** background update check at
+most once every 24 hours. If a newer release is already known, `gm` prints a
+short notice to **stderr** while keeping stdout JSON unchanged.
 
 ---
 

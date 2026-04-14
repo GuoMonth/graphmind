@@ -15,6 +15,7 @@ import (
 	"github.com/senguoyun-guosheng/graphmind/internal/model"
 	"github.com/senguoyun-guosheng/graphmind/internal/proposal"
 	"github.com/senguoyun-guosheng/graphmind/internal/tag"
+	"github.com/senguoyun-guosheng/graphmind/internal/update"
 	"github.com/spf13/cobra"
 )
 
@@ -31,6 +32,7 @@ type services struct {
 	graph    *graph.Service
 	tag      *tag.Service
 	proposal *proposal.Service
+	updater  *update.Manager
 }
 
 var svc services
@@ -107,6 +109,7 @@ COMMANDS
 
   Setup:
     init       Initialize graph database      gm init
+    update     Check/apply CLI updates        gm update check
 
 GLOBAL FLAGS
 
@@ -138,8 +141,10 @@ Use "gm <command> --help" for detailed usage, examples, and output samples.`,
 
 func init() {
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
-		// init handles its own DB setup; skip for root-only (help/version)
-		if cmd.Name() == "init" || cmd.Parent() == nil {
+		if shouldAutoCheckForUpdates(cmd) && svc.updater != nil {
+			svc.updater.MaybeNotifyAndCheck()
+		}
+		if shouldSkipServiceWire(cmd) {
 			return nil
 		}
 		return wireAndMigrate(cmd.Context())
@@ -162,11 +167,13 @@ func init() {
 	rootCmd.AddCommand(grepCmd)
 	rootCmd.AddCommand(logCmd)
 	rootCmd.AddCommand(batchCmd)
+	rootCmd.AddCommand(updateCmd)
 }
 
 // Execute runs the root command and handles exit codes.
 func Execute(version string) {
 	rootCmd.Version = version
+	svc.updater = update.NewManager(version)
 	if err := rootCmd.Execute(); err != nil {
 		code := outputError(err)
 		os.Exit(code)
@@ -282,4 +289,30 @@ func newJSONEncoder(w io.Writer) *json.Encoder {
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
 	return enc
+}
+
+func shouldSkipServiceWire(cmd *cobra.Command) bool {
+	if cmd == nil || cmd.Parent() == nil {
+		return true
+	}
+	return commandInTree(cmd, "init") || commandInTree(cmd, "update")
+}
+
+func shouldAutoCheckForUpdates(cmd *cobra.Command) bool {
+	if quiet || cmd == nil {
+		return false
+	}
+	if cmd.Parent() == nil {
+		return false
+	}
+	return !commandInTree(cmd, "init") && !commandInTree(cmd, "update")
+}
+
+func commandInTree(cmd *cobra.Command, name string) bool {
+	for current := cmd; current != nil; current = current.Parent() {
+		if current.Name() == name {
+			return true
+		}
+	}
+	return false
 }

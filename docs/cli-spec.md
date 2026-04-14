@@ -106,6 +106,8 @@ One JSON object per line. Every object includes `id` and `entity` for downstream
 | Command | Purpose |
 |---|---|
 | `gm init` | Initialize graph database |
+| `gm update check` | Check GitHub Releases for a newer CLI version |
+| `gm update apply` | Download and install a release archive |
 | `gm schema` | Machine-readable command/type schema (JSON) |
 
 ---
@@ -169,6 +171,45 @@ gm init [--db <path>]
 ```
 
 Creates the database file and runs all migrations. Safe to run on existing databases (migrations are idempotent).
+
+---
+
+### gm update check
+
+Check GitHub Releases for a newer `gm` binary.
+
+```
+gm update check
+```
+
+This command performs a blocking network request and refreshes the local update
+cache immediately.
+
+Regular `gm` commands may also trigger a **non-blocking** background update
+check at most once every 24 hours. Any update hint is written to **stderr** so
+stdout remains valid JSON.
+
+---
+
+### gm update apply
+
+Download and install the latest matching release asset for the current
+platform.
+
+```
+gm update apply [--version <tag>]
+```
+
+| Flag | Description |
+|---|---|
+| `--version <tag>` | Install a specific release tag instead of the latest one |
+
+Examples:
+
+```bash
+gm update apply
+gm update apply --version v0.3.1
+```
 
 ---
 
