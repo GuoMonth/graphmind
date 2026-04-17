@@ -62,7 +62,10 @@ var updateApplyCmd = &cobra.Command{
 replace the current gm executable.
 
 By default this installs the latest release. Use --version to pin a specific
-tag such as v0.3.1.`,
+tag such as v0.3.1.
+
+gm verifies the GitHub-provided sha256 digest for the selected release asset
+before replacing the current binary.`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		result, err := svc.updater.Apply(cmd.Context(), updateApplyVersion)
 		if err != nil {

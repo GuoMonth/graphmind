@@ -231,6 +231,10 @@ gm update apply
 gm update apply --version v0.3.1
 ```
 
+`gm update apply` only installs release assets that include a GitHub-provided
+`sha256:` digest, and it verifies the downloaded archive before replacing the
+current binary.
+
 Normal `gm` commands may trigger a **non-blocking** background update check at
 most once every 24 hours. If a newer release is already known, `gm` prints a
 short notice to **stderr** while keeping stdout JSON unchanged.
