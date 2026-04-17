@@ -448,7 +448,7 @@ func parseAssetDigest(digest string) ([]byte, error) {
 	return expected, nil
 }
 
-func verifyAssetDigest(payload []byte, expected []byte) error {
+func verifyAssetDigest(payload, expected []byte) error {
 	sum := sha256.Sum256(payload)
 	if !bytes.Equal(sum[:], expected) {
 		return fmt.Errorf("update archive checksum mismatch")
