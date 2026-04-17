@@ -117,6 +117,12 @@ Everything else spelled out: `reference` not `ref`, `description` not `desc`, `p
 - JSON struct tags: `snake_case`
 - Imports grouped: stdlib, third-party, internal (blank line between groups)
 
+### CLI stdin handling
+
+- Centralize CLI stdin parsing in `internal/cli/stdin.go`
+- New stdin / JSON / JSONL handling must extend the shared helpers there instead of adding command-local parsing logic
+- Keep limits, pipe detection, and invalid-input error shaping consistent across commands
+
 ### Dependencies
 
 | Package | Purpose |

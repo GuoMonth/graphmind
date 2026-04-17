@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"bufio"
-	"encoding/json"
 	"fmt"
 	"os"
 
@@ -52,28 +50,16 @@ OUTPUT
 
 		// Read IDs from stdin pipe if available
 		const maxBatchIDs = 10000
-		stat, err := os.Stdin.Stat()
-		if err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
-			scanner := bufio.NewScanner(os.Stdin)
-			for scanner.Scan() {
-				line := scanner.Bytes()
-				if len(line) == 0 {
-					continue
-				}
-				var obj map[string]any // JSONL objects are untyped
-				if err := json.Unmarshal(line, &obj); err != nil {
-					continue
-				}
-				if id, ok := obj["id"].(string); ok && id != "" {
-					ids = append(ids, id)
-				}
-				if len(ids) > maxBatchIDs {
-					return fmt.Errorf("%w: too many IDs (max %d)", model.ErrInvalidInput, maxBatchIDs)
-				}
-			}
-			if err := scanner.Err(); err != nil {
-				return fmt.Errorf("%w: read stdin: %s", model.ErrInvalidInput, err)
-			}
+		if len(ids) > maxBatchIDs {
+			return fmt.Errorf("%w: too many IDs (max %d)", model.ErrInvalidInput, maxBatchIDs)
+		}
+
+		stdinIDs, err := readOptionalIDsFromJSONLStdin(os.Stdin, maxBatchIDs-len(ids))
+		if err != nil {
+			return err
+		}
+		if len(stdinIDs) > 0 {
+			ids = append(ids, stdinIDs...)
 		}
 
 		if len(ids) == 0 {
