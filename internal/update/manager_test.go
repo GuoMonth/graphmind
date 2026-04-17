@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,11 +21,16 @@ import (
 )
 
 func TestCheckWritesStateAndFindsPlatformAsset(t *testing.T) {
+	sum := sha256.Sum256([]byte("gm-v1.2.0-darwin-arm64.tar.gz"))
 	release := Release{
 		TagName: "v1.2.0",
 		HTMLURL: "https://example.invalid/releases/v1.2.0",
 		Assets: []Asset{
-			{Name: "gm-v1.2.0-darwin-arm64.tar.gz", BrowserDownloadURL: "https://example.invalid/darwin-arm64.tar.gz"},
+			{
+				Name:               "gm-v1.2.0-darwin-arm64.tar.gz",
+				BrowserDownloadURL: "https://github.com/GuoMonth/graphmind/releases/download/v1.2.0/gm-v1.2.0-darwin-arm64.tar.gz",
+				Digest:             "sha256:" + hex.EncodeToString(sum[:]),
+			},
 		},
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -68,6 +74,44 @@ func TestCheckWritesStateAndFindsPlatformAsset(t *testing.T) {
 	}
 	if !state.UpdateAvailable {
 		t.Fatalf("expected cached update availability")
+	}
+}
+
+func TestCheckRejectsMissingDigest(t *testing.T) {
+	release := Release{
+		TagName: "v1.2.0",
+		Assets: []Asset{
+			{
+				Name:               "gm-v1.2.0-darwin-arm64.tar.gz",
+				BrowserDownloadURL: "https://github.com/GuoMonth/graphmind/releases/download/v1.2.0/gm-v1.2.0-darwin-arm64.tar.gz",
+				Digest:             " ",
+			},
+		},
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewEncoder(w).Encode(release); err != nil {
+			t.Fatalf("encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	manager := newTestManager(t)
+	manager.apiBase = server.URL
+	manager.goos = "darwin"
+	manager.goarch = "arm64"
+	manager.currentVersion = "v1.1.0"
+
+	_, err := manager.Check(context.Background(), CheckOptions{})
+	if err == nil || !strings.Contains(err.Error(), "missing asset digest") {
+		t.Fatalf("err = %v, want missing asset digest", err)
+	}
+
+	state, loadErr := manager.loadState()
+	if loadErr != nil {
+		t.Fatalf("load state: %v", loadErr)
+	}
+	if !strings.Contains(state.LastError, "missing asset digest") {
+		t.Fatalf("last error = %q, want missing asset digest", state.LastError)
 	}
 }
 
@@ -187,6 +231,53 @@ func TestApplyDownloadsArchiveVerifiesDigestAndPassesBinary(t *testing.T) {
 	}
 }
 
+func TestApplyRejectsMissingDigest(t *testing.T) {
+	archive := mustTarGzBinary(t, "gm", []byte("new-binary"))
+
+	var serverURL string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/releases/latest":
+			release := Release{
+				TagName: "v1.2.0",
+				HTMLURL: "https://example.invalid/releases/v1.2.0",
+				Assets: []Asset{
+					{
+						Name:               "gm-v1.2.0-linux-amd64.tar.gz",
+						BrowserDownloadURL: serverURL + "/assets/linux-amd64.tar.gz",
+						Digest:             "   ",
+					},
+				},
+			}
+			if err := json.NewEncoder(w).Encode(release); err != nil {
+				t.Fatalf("encode release: %v", err)
+			}
+		case "/assets/linux-amd64.tar.gz":
+			_, _ = w.Write(archive)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	serverURL = server.URL
+
+	manager := newTestManager(t)
+	manager.apiBase = server.URL
+	manager.goos = "linux"
+	manager.goarch = "amd64"
+	manager.currentVersion = "v1.1.0"
+	manager.executablePath = func() (string, error) { return "/usr/local/bin/gm", nil }
+	manager.applyBinary = func(binary []byte) error {
+		t.Fatalf("applyBinary should not be called when digest is missing")
+		return nil
+	}
+
+	_, err := manager.Apply(context.Background(), "")
+	if err == nil || !strings.Contains(err.Error(), "missing asset digest") {
+		t.Fatalf("err = %v, want missing asset digest", err)
+	}
+}
+
 func TestApplyReturnsUpToDateWithoutDownload(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		release := Release{
@@ -232,9 +323,32 @@ func TestDownloadAssetRejectsOversizedPayload(t *testing.T) {
 	_, err := manager.downloadAsset(context.Background(), Asset{
 		Name:               "gm-v1.2.0-linux-amd64.tar.gz",
 		BrowserDownloadURL: server.URL,
-	})
+	}.selected())
 	if err == nil || !strings.Contains(err.Error(), "asset too large") {
 		t.Fatalf("err = %v, want asset too large", err)
+	}
+}
+
+func TestCheckUpdateRedirectRejectsUntrustedHost(t *testing.T) {
+	req := &http.Request{URL: mustParseURL(t, "https://example.com/archive.tar.gz")}
+	via := []*http.Request{
+		{URL: mustParseURL(t, "https://github.com/GuoMonth/graphmind/releases/latest")},
+	}
+
+	err := checkUpdateRedirect(req, via)
+	if err == nil || !strings.Contains(err.Error(), "untrusted update host") {
+		t.Fatalf("err = %v, want untrusted update host", err)
+	}
+}
+
+func TestCheckUpdateRedirectAllowsGitHubHosts(t *testing.T) {
+	req := &http.Request{URL: mustParseURL(t, "https://release-assets.githubusercontent.com/asset")}
+	via := []*http.Request{
+		{URL: mustParseURL(t, "https://github.com/GuoMonth/graphmind/releases/latest")},
+	}
+
+	if err := checkUpdateRedirect(req, via); err != nil {
+		t.Fatalf("check redirect: %v", err)
 	}
 }
 
@@ -254,7 +368,7 @@ func newTestManager(t *testing.T) *Manager {
 	dir := t.TempDir()
 	return &Manager{
 		currentVersion: "v0.0.0",
-		client:         &http.Client{Timeout: 2 * time.Second},
+		client:         newUpdateClient(2 * time.Second),
 		apiBase:        "https://example.invalid",
 		cachePath:      filepath.Join(dir, "update.json"),
 		lockPath:       filepath.Join(dir, "update.lock"),
@@ -266,6 +380,23 @@ func newTestManager(t *testing.T) *Manager {
 		startProcess:   func(string, ...string) error { return nil },
 		applyBinary:    func([]byte) error { return nil },
 	}
+}
+
+func (asset Asset) selected() selectedAsset {
+	digestBytes, _ := parseAssetDigest("sha256:" + strings.Repeat("0", sha256.Size*2))
+	return selectedAsset{
+		Asset:       asset,
+		digestBytes: digestBytes,
+	}
+}
+
+func mustParseURL(t *testing.T, raw string) *url.URL {
+	t.Helper()
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		t.Fatalf("parse URL %q: %v", raw, err)
+	}
+	return parsed
 }
 
 func mustTarGzBinary(t *testing.T, name string, payload []byte) []byte {

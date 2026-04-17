@@ -79,3 +79,46 @@ jobs:
           name: ${{ github.ref_name }}
           generate_release_notes: true
           files: dist/*
+
+      - name: Verify release asset digests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          for attempt in $(seq 1 10); do
+            release_json="$(gh api "repos/${REPOSITORY}/releases/tags/${TAG}")"
+            missing=0
+            mismatch=0
+
+            for artifact in dist/*; do
+              name="$(basename "${artifact}")"
+              expected="sha256:$(sha256sum "${artifact}" | awk '{print $1}')"
+              actual="$(printf '%s' "${release_json}" | jq -r --arg name "${name}" '.assets[] | select(.name == $name) | .digest // empty')"
+
+              if [ -z "${actual}" ]; then
+                echo "asset ${name} is missing digest metadata"
+                missing=1
+                continue
+              fi
+
+              if [ "${actual}" != "${expected}" ]; then
+                echo "asset ${name} digest mismatch: expected ${expected}, got ${actual}"
+                mismatch=1
+              fi
+            done
+
+            if [ "${missing}" -eq 0 ] && [ "${mismatch}" -eq 0 ]; then
+              echo "release asset digests verified"
+              exit 0
+            fi
+
+            if [ "${attempt}" -lt 10 ]; then
+              echo "release metadata not ready yet; retrying (${attempt}/10)"
+              sleep 3
+            fi
+          done
+
+          exit 1

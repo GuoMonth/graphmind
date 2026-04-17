@@ -25,6 +25,7 @@ const (
 	defaultCheckInterval   = 24 * time.Hour
 	defaultLockTTL         = 15 * time.Minute
 	backgroundCheckTimeout = 750 * time.Millisecond
+	maxRedirects           = 5
 	maxArchiveBytes        = 100 << 20
 	defaultGitHubAPIBase   = "https://api.github.com/repos/GuoMonth/graphmind"
 	defaultInstallCommand  = "gm update apply"
@@ -32,6 +33,11 @@ const (
 	backgroundCheckSubcmd  = "check"
 	backgroundParentSubcmd = "update"
 )
+
+type selectedAsset struct {
+	Asset
+	digestBytes []byte
+}
 
 // Manager handles release discovery, update cache state, and binary replacement.
 type Manager struct {
@@ -55,9 +61,7 @@ func NewManager(currentVersion string) *Manager {
 	cacheDir := defaultCacheDir()
 	return &Manager{
 		currentVersion: currentVersion,
-		client: &http.Client{
-			Timeout: 5 * time.Second,
-		},
+		client:         newUpdateClient(5 * time.Second),
 		apiBase:        defaultGitHubAPIBase,
 		cachePath:      filepath.Join(cacheDir, "update.json"),
 		lockPath:       filepath.Join(cacheDir, "update.lock"),
@@ -184,7 +188,7 @@ func (m *Manager) Apply(ctx context.Context, targetVersion string) (ApplyResult,
 	if err != nil {
 		return ApplyResult{}, err
 	}
-	if err := verifyAssetDigest(archive, asset.Digest); err != nil {
+	if err := verifyAssetDigest(archive, asset.digestBytes); err != nil {
 		return ApplyResult{}, err
 	}
 	binary, err := extractBinary(archive, m.goos)
@@ -262,17 +266,24 @@ func (m *Manager) getRelease(ctx context.Context, endpoint string) (Release, err
 	return release, nil
 }
 
-func (m *Manager) findAsset(release Release) (Asset, error) {
+func (m *Manager) findAsset(release Release) (selectedAsset, error) {
 	expected := archiveName(release.TagName, m.goos, m.goarch)
 	for _, asset := range release.Assets {
 		if asset.Name == expected {
-			return asset, nil
+			digestBytes, err := parseAssetDigest(asset.Digest)
+			if err != nil {
+				return selectedAsset{}, fmt.Errorf("release asset %q: %w", asset.Name, err)
+			}
+			return selectedAsset{
+				Asset:       asset,
+				digestBytes: digestBytes,
+			}, nil
 		}
 	}
-	return Asset{}, fmt.Errorf("no release asset for %s/%s (expected %s)", m.goos, m.goarch, expected)
+	return selectedAsset{}, fmt.Errorf("no release asset for %s/%s (expected %s)", m.goos, m.goarch, expected)
 }
 
-func (m *Manager) downloadAsset(ctx context.Context, asset Asset) ([]byte, error) {
+func (m *Manager) downloadAsset(ctx context.Context, asset selectedAsset) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, asset.BrowserDownloadURL, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("create asset request: %w", err)
@@ -392,18 +403,52 @@ func shouldAutoCheck(state *State, currentVersion string, now time.Time) bool {
 	return now.Sub(state.CheckedAt) >= defaultCheckInterval
 }
 
-func verifyAssetDigest(payload []byte, digest string) error {
-	if strings.TrimSpace(digest) == "" {
-		return nil
+func newUpdateClient(timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout:       timeout,
+		CheckRedirect: checkUpdateRedirect,
+	}
+}
+
+func checkUpdateRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= maxRedirects {
+		return fmt.Errorf("too many update redirects")
+	}
+	if !isTrustedUpdateHost(req.URL.Hostname()) {
+		return fmt.Errorf("redirect to untrusted update host %q", req.URL.Hostname())
+	}
+	return nil
+}
+
+func isTrustedUpdateHost(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	switch host {
+	case "github.com", "githubusercontent.com":
+		return true
+	}
+	return strings.HasSuffix(host, ".github.com") || strings.HasSuffix(host, ".githubusercontent.com")
+}
+
+func parseAssetDigest(digest string) ([]byte, error) {
+	digest = strings.TrimSpace(digest)
+	if digest == "" {
+		return nil, fmt.Errorf("missing asset digest")
 	}
 	const prefix = "sha256:"
 	if !strings.HasPrefix(digest, prefix) {
-		return fmt.Errorf("unsupported asset digest format %q", digest)
+		return nil, fmt.Errorf("unsupported asset digest format %q", digest)
 	}
 	expected, err := hex.DecodeString(strings.TrimPrefix(digest, prefix))
 	if err != nil {
-		return fmt.Errorf("decode asset digest: %w", err)
+		return nil, fmt.Errorf("decode asset digest: %w", err)
 	}
+	if len(expected) != sha256.Size {
+		return nil, fmt.Errorf("invalid asset digest length %d", len(expected))
+	}
+	return expected, nil
+}
+
+func verifyAssetDigest(payload, expected []byte) error {
 	sum := sha256.Sum256(payload)
 	if !bytes.Equal(sum[:], expected) {
 		return fmt.Errorf("update archive checksum mismatch")

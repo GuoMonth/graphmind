@@ -183,7 +183,8 @@ gm update check
 ```
 
 This command performs a blocking network request and refreshes the local update
-cache immediately.
+cache immediately. The selected platform asset must include a valid
+GitHub-provided `sha256:` digest or the check fails.
 
 Regular `gm` commands may also trigger a **non-blocking** background update
 check at most once every 24 hours. Any update hint is written to **stderr** so
@@ -194,7 +195,8 @@ stdout remains valid JSON.
 ### gm update apply
 
 Download and install the latest matching release asset for the current
-platform.
+platform. `gm` verifies the selected asset's `sha256:` digest before replacing
+the current executable.
 
 ```
 gm update apply [--version <tag>]
