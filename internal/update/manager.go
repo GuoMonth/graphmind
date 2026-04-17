@@ -393,8 +393,9 @@ func shouldAutoCheck(state *State, currentVersion string, now time.Time) bool {
 }
 
 func verifyAssetDigest(payload []byte, digest string) error {
-	if strings.TrimSpace(digest) == "" {
-		return nil
+	digest = strings.TrimSpace(digest)
+	if digest == "" {
+		return fmt.Errorf("missing asset digest")
 	}
 	const prefix = "sha256:"
 	if !strings.HasPrefix(digest, prefix) {

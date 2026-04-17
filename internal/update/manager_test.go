@@ -187,6 +187,53 @@ func TestApplyDownloadsArchiveVerifiesDigestAndPassesBinary(t *testing.T) {
 	}
 }
 
+func TestApplyRejectsMissingDigest(t *testing.T) {
+	archive := mustTarGzBinary(t, "gm", []byte("new-binary"))
+
+	var serverURL string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/releases/latest":
+			release := Release{
+				TagName: "v1.2.0",
+				HTMLURL: "https://example.invalid/releases/v1.2.0",
+				Assets: []Asset{
+					{
+						Name:               "gm-v1.2.0-linux-amd64.tar.gz",
+						BrowserDownloadURL: serverURL + "/assets/linux-amd64.tar.gz",
+						Digest:             "   ",
+					},
+				},
+			}
+			if err := json.NewEncoder(w).Encode(release); err != nil {
+				t.Fatalf("encode release: %v", err)
+			}
+		case "/assets/linux-amd64.tar.gz":
+			_, _ = w.Write(archive)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	serverURL = server.URL
+
+	manager := newTestManager(t)
+	manager.apiBase = server.URL
+	manager.goos = "linux"
+	manager.goarch = "amd64"
+	manager.currentVersion = "v1.1.0"
+	manager.executablePath = func() (string, error) { return "/usr/local/bin/gm", nil }
+	manager.applyBinary = func(binary []byte) error {
+		t.Fatalf("applyBinary should not be called when digest is missing")
+		return nil
+	}
+
+	_, err := manager.Apply(context.Background(), "")
+	if err == nil || !strings.Contains(err.Error(), "missing asset digest") {
+		t.Fatalf("err = %v, want missing asset digest", err)
+	}
+}
+
 func TestApplyReturnsUpToDateWithoutDownload(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		release := Release{
