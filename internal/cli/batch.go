@@ -3,7 +3,6 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/senguoyun-guosheng/graphmind/internal/model"
@@ -63,13 +62,9 @@ OUTPUT
   Error — invalid command:
   {"ok":false,"error":{"code":"INVALID_INPUT","message":"invalid input: unknown batch command \"foo\""}}`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		const maxStdinBytes = 10 << 20 // 10 MB
-		input, err := io.ReadAll(io.LimitReader(os.Stdin, maxStdinBytes+1))
+		input, err := readBoundedStdinBytes(os.Stdin, maxJSONStdinBytes)
 		if err != nil {
-			return fmt.Errorf("%w: read stdin: %s", model.ErrInvalidInput, err)
-		}
-		if len(input) > maxStdinBytes {
-			return fmt.Errorf("%w: stdin exceeds 10 MB limit", model.ErrInvalidInput)
+			return err
 		}
 		if len(input) == 0 {
 			return fmt.Errorf("%w: stdin is empty, expected JSON array", model.ErrInvalidInput)

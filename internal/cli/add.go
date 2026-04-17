@@ -1,9 +1,7 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/senguoyun-guosheng/graphmind/internal/model"
@@ -59,19 +57,12 @@ STDIN FORMAT
 		}
 
 		// If stdin has data, use it instead of flags
-		stat, err := os.Stdin.Stat()
-		if err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
-			input, err := io.ReadAll(os.Stdin)
-			if err != nil {
-				return fmt.Errorf("%w: read stdin: %s", model.ErrInvalidInput, err)
-			}
-			if len(input) > 0 {
-				var stdinData map[string]any // JSON input is untyped
-				if err := json.Unmarshal(input, &stdinData); err != nil {
-					return fmt.Errorf("%w: invalid JSON: %s", model.ErrInvalidInput, err)
-				}
-				data = stdinData
-			}
+		stdinData, hasInput, err := readOptionalJSONObjectFromStdin(os.Stdin)
+		if err != nil {
+			return err
+		}
+		if hasInput {
+			data = stdinData
 		}
 
 		nodeType, _ := data["type"].(string)
