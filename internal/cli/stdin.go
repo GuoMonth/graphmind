@@ -89,10 +89,10 @@ func readOptionalIDsFromJSONLStdin(stdin *os.File, maxIDs int) ([]string, error)
 			continue
 		}
 
-		ids = append(ids, payload.ID)
-		if len(ids) > maxIDs {
+		if len(ids) >= maxIDs {
 			return nil, fmt.Errorf("%w: too many IDs (max %d)", model.ErrInvalidInput, maxIDs)
 		}
+		ids = append(ids, payload.ID)
 	}
 	if err := scanner.Err(); err != nil {
 		if errors.Is(err, bufio.ErrTooLong) {
