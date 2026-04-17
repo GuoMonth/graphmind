@@ -4,13 +4,47 @@ on:
   push:
     tags: ["v*"]
 
-permissions:
-  contents: write
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  release:
+  verify:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+        run: make build
+
+      - name: Test
+        run: make test
+
+      - name: Vet
+        run: make vet
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.11.4
+
+  release:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
+      fail-fast: false
       matrix:
         include:
           - goos: linux
@@ -33,43 +67,52 @@ jobs:
           go-version-file: go.mod
 
       - name: Build and package
+        id: package
         env:
+          CGO_ENABLED: "0"
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           TAG: ${{ github.ref_name }}
         run: |
+          set -euo pipefail
+
           BIN="gm"
-          if [ "$GOOS" = "windows" ]; then BIN="gm.exe"; fi
+          if [ "$GOOS" = "windows" ]; then
+            BIN="gm.exe"
+          fi
+
+          mkdir -p dist
 
           go build -ldflags="-s -w -X main.version=${TAG}" -o "${BIN}" ./cmd/gm
 
           if [ "$GOOS" = "windows" ]; then
-            ARCHIVE="gm-${TAG}-${GOOS}-${GOARCH}.zip"
-            zip "${ARCHIVE}" "${BIN}"
+            ARCHIVE="dist/gm-${TAG}-${GOOS}-${GOARCH}.zip"
+            zip -q "${ARCHIVE}" "${BIN}"
           else
-            ARCHIVE="gm-${TAG}-${GOOS}-${GOARCH}.tar.gz"
+            ARCHIVE="dist/gm-${TAG}-${GOOS}-${GOARCH}.tar.gz"
             tar czf "${ARCHIVE}" "${BIN}"
           fi
 
-          echo "ARTIFACT=${ARCHIVE}" >> "$GITHUB_ENV"
+          echo "artifact=${ARCHIVE}" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: gm-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: ${{ env.ARTIFACT }}
+          path: ${{ steps.package.outputs.artifact }}
+          if-no-files-found: error
+          compression-level: 0
 
   publish:
     needs: release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
+          pattern: gm-*
           path: dist
           merge-multiple: true
 
@@ -87,9 +130,25 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
+          shopt -s nullglob
+
+          artifacts=(dist/*)
+          if [ "${#artifacts[@]}" -eq 0 ]; then
+            echo "no release artifacts were downloaded"
+            exit 1
+          fi
 
           for attempt in $(seq 1 10); do
-            release_json="$(gh api "repos/${REPOSITORY}/releases/tags/${TAG}")"
+            if ! release_json="$(gh api "repos/${REPOSITORY}/releases/tags/${TAG}" 2>/dev/null)"; then
+              if [ "${attempt}" -lt 10 ]; then
+                echo "release metadata not ready yet; retrying (${attempt}/10)"
+                sleep 3
+                continue
+              fi
+              echo "release metadata is still unavailable for ${TAG}"
+              exit 1
+            fi
+
             missing=0
             mismatch=0
 
