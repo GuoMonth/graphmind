@@ -92,6 +92,51 @@ func TestReadOptionalJSONObjectFromStdinRejectsOversizedInput(t *testing.T) {
 	}
 }
 
+func TestReadOptionalIDsFromJSONLStdinParsesIDs(t *testing.T) {
+	file := mustTempInputFile(t, strings.Join([]string{
+		`{"id":"019abc","title":"First"}`,
+		`{"title":"missing id"}`,
+		`not-json`,
+		`{"id":"019def"}`,
+		"",
+	}, "\n"))
+
+	got, err := readOptionalIDsFromJSONLStdin(file, 10)
+	if err != nil {
+		t.Fatalf("read optional JSONL ids: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("ids = %v, want 2 entries", got)
+	}
+	if got[0] != "019abc" || got[1] != "019def" {
+		t.Fatalf("ids = %v, want [019abc 019def]", got)
+	}
+}
+
+func TestReadOptionalIDsFromJSONLStdinRejectsOversizedLine(t *testing.T) {
+	file := mustTempInputFile(t, strings.Repeat("x", int(maxJSONStdinBytes)+1))
+
+	_, err := readOptionalIDsFromJSONLStdin(file, 10)
+	if !errors.Is(err, model.ErrInvalidInput) {
+		t.Fatalf("err = %v, want invalid input", err)
+	}
+	if !strings.Contains(err.Error(), "JSONL line exceeds 10 MB limit") {
+		t.Fatalf("err = %v, want JSONL line limit error", err)
+	}
+}
+
+func TestReadOptionalIDsFromJSONLStdinRejectsTooManyIDs(t *testing.T) {
+	file := mustTempInputFile(t, `{"id":"019abc"}`+"\n"+`{"id":"019def"}`)
+
+	_, err := readOptionalIDsFromJSONLStdin(file, 1)
+	if !errors.Is(err, model.ErrInvalidInput) {
+		t.Fatalf("err = %v, want invalid input", err)
+	}
+	if !strings.Contains(err.Error(), "too many IDs") {
+		t.Fatalf("err = %v, want too many IDs", err)
+	}
+}
+
 func mustTempInputFile(t *testing.T, content string) *os.File {
 	t.Helper()
 
