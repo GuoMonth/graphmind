@@ -2,17 +2,22 @@
 
 Unix-native commands. Pipeline composability. AI-first I/O.
 
+> **Status key** — commands and flags are marked **[implemented]** (shipped) or
+> **[planned]** (not yet available). AI agents and scripts should only rely on
+> implemented items.
+
 ---
 
 ## Philosophy
 
-GraphMind CLI borrows **Unix command names** — `ls`, `cat`, `grep`, `tree`, `ln`, `rm`. If you know Unix, you know `gm`. Commands compose via `|` pipes using JSONL as the interchange protocol.
-
-The CLI is built for AI agents. Output is structured JSON. Input is flags (reads) or stdin JSON (writes). No interactive prompts, no ANSI escapes.
+GraphMind CLI borrows **Unix command names** — `ls`, `cat`, `grep`, `ln`, `rm`.
+If you know Unix, you know `gm`. Commands compose via `|` pipes.
+The CLI is built for AI agents. Output is structured JSON. Input is flags
+(reads) or stdin JSON (writes). No interactive prompts, no ANSI escapes.
 
 ### Core contract
 
-1. **stdout is always valid JSON** (envelope or JSONL) or empty with `--quiet`
+1. **stdout is always valid JSON** (envelope) or empty with `--quiet`
 2. **stderr is for diagnostics only** — never parsed
 3. **Exit code is the truth** — check exit code first, then parse stdout
 4. **Reads never mutate** — no side effects without explicit write commands
@@ -20,7 +25,10 @@ The CLI is built for AI agents. Output is structured JSON. Input is flags (reads
 
 ### Naming: Unix verbs, internal vocabulary
 
-CLI commands use Unix standard names (`ls`, `rm`, `cat`). Internal types, event names, and JSON fields use the [canonical vocabulary](conventions.md) (`list`, `delete`, `get`). This is the same pattern as Unix: the command is `rm`, the syscall is `unlink()`.
+CLI commands use Unix standard names (`ls`, `rm`, `cat`). Internal types, event
+names, and JSON fields use the [canonical vocabulary](conventions.md) (`list`,
+`delete`, `get`). This is the same pattern as Unix: the command is `rm`, the
+syscall is `unlink()`.
 
 | CLI command | Internal action | Event type |
 |---|---|---|
@@ -43,17 +51,6 @@ CLI commands use Unix standard names (`ls`, `rm`, `cat`). Internal types, event 
 
 Used when AI agents call `gm` directly. Full response in one JSON object.
 
-### JSONL mode (pipe or `--jsonl`)
-
-One JSON object per line. Every object includes `id` and `entity` for downstream commands:
-
-```
-{"id":"019abc...","entity":"node","type":"event","title":"Had dinner with David"}
-{"id":"019def...","entity":"node","type":"event","title":"Met Lisa at conference"}
-```
-
-**Auto-detection**: if stdout is a pipe, use JSONL. Override with `--envelope` or `--jsonl`.
-
 ### Error codes
 
 | Code | Exit | Meaning |
@@ -70,92 +67,67 @@ One JSON object per line. Every object includes `id` and `entity` for downstream
 
 ### Read — query the graph
 
-| Command | Unix analog | Purpose |
-|---|---|---|
-| `gm ls [entity]` | `ls` | List entities with filters |
-| `gm cat <id>` | `cat` | Show full detail of one entity |
-| `gm grep <pattern> [entity]` | `grep` | Full-text search (FTS5) |
-| `gm find` | `find` | Advanced query — tags + filters + expand |
-| `gm tree <id>` | `tree` | Traverse graph as tree |
-| `gm log` | `git log` | View event history |
-| `gm stat` | `stat` | Graph statistics |
+| Command | Unix analog | Purpose | Status |
+|---|---|---|---|
+| `gm ls [entity]` | `ls` | List entities with filters | **implemented** |
+| `gm cat <id>` | `cat` | Show full detail of one entity | **implemented** |
+| `gm grep <pattern>` | `grep` | Full-text node search (FTS5) | **implemented** |
+| `gm log` | `git log` | View event history | **implemented** |
+| `gm find` | `find` | Advanced query — tags + filters + expand | planned |
+| `gm tree <id>` | `tree` | Traverse graph as tree | planned |
+| `gm stat` | `stat` | Graph statistics | planned |
 
 ### Write — mutate the graph (all writes create proposals)
 
-| Command | Unix analog | Purpose |
-|---|---|---|
-| `gm add` | `touch` | Create node → proposal |
-| `gm ln <from-id> <to-id>` | `ln` | Create edge → proposal |
-| `gm tag <node-id> <tag-name>` | `tag` (macOS) | Tag a node (upsert tag) → proposal |
-| `gm untag <node-id> <tag-name>` | — | Remove tag from node → proposal |
-| `gm mv <id>` | `mv` | Update entity → proposal |
-| `gm rm <id>...` | `rm` | Delete entities → proposal |
-| `gm batch` | `xargs` | Multi-operation proposal from stdin |
-| `gm commit <proposal-id>` | `git commit` | Commit a pending proposal |
-| `gm reject <proposal-id>` | `git reset` | Reject a pending proposal |
+| Command | Unix analog | Purpose | Status |
+|---|---|---|---|
+| `gm add` | `touch` | Create node → proposal | **implemented** |
+| `gm ln <from-id> <to-id>` | `ln` | Create edge → proposal | **implemented** |
+| `gm tag <node-id> <tag-name>` | `tag` (macOS) | Tag a node (upsert tag) → proposal | **implemented** |
+| `gm mv <id>` | `mv` | Update entity → proposal | **implemented** |
+| `gm rm <id>...` | `rm` | Delete entities → proposal | **implemented** |
+| `gm batch` | `xargs` | Multi-operation proposal from stdin | **implemented** |
+| `gm commit <proposal-id>` | `git commit` | Commit a pending proposal | **implemented** |
+| `gm reject <proposal-id>` | `git reset` | Reject a pending proposal | **implemented** |
+| `gm untag <node-id> <tag-name>` | — | Remove tag from node → proposal | planned |
 
 ### Organize — maintain graph health
 
-| Command | Unix analog | Purpose |
-|---|---|---|
-| `gm merge <tag-id> <tag-id>` | — | Merge duplicate tags → proposal |
-| `gm gc` | `git gc` | Find orphan tags, disconnected nodes |
+| Command | Unix analog | Purpose | Status |
+|---|---|---|---|
+| `gm merge <tag-id> <tag-id>` | — | Merge duplicate tags → proposal | planned |
+| `gm gc` | `git gc` | Find orphan tags, disconnected nodes | planned |
 
 ### Utility
 
-| Command | Purpose |
-|---|---|
-| `gm init` | Initialize graph database |
-| `gm update check` | Check GitHub Releases for a newer CLI version |
-| `gm update apply` | Download and install a release archive |
-| `gm schema` | Machine-readable command/type schema (JSON) |
+| Command | Purpose | Status |
+|---|---|---|
+| `gm init` | Initialize graph database | **implemented** |
+| `gm update check` | Check GitHub Releases for a newer CLI version | **implemented** |
+| `gm update apply` | Download and install a release archive | **implemented** |
+| `gm schema` | Machine-readable command/type schema (JSON) | planned |
 
 ---
 
 ## Pipeline Model
 
-Commands compose via `|` pipes. **Read commands filter, write commands batch.**
-
-### Protocol
-
-- Pipe output: JSONL (one JSON object per line, each with `id` + `entity`)
-- Pipe input: commands detect piped stdin and use IDs as context
-- No pipe: commands use flags/positional args as normal
-
-### Per-command pipe behavior
-
-| Command | Standalone | With piped input |
-|---|---|---|
-| `gm ls` | List all (with filters) | Filter: only list entities matching piped IDs |
-| `gm cat` | Show one by ID | Show detail for each piped entity |
-| `gm grep` | Search entire graph | Filter: search only within piped entities |
-| `gm find` | Query full graph | Use piped entities as starting points |
-| `gm tree` | Tree from one root | Use each piped entity as tree root |
-| `gm log` | All events | Events for piped entities only |
-| `gm stat` | Overall graph stats | Stats for piped entities only |
-| `gm rm` | Delete by ID args | Delete all piped entities → proposal |
-| `gm tag` | Tag one node | Tag all piped entities → proposal |
-| `gm mv` | Update one entity | Update all piped entities → proposal |
+**Read commands** output a JSON envelope. The `gm rm` command reads JSONL IDs
+from a piped stdin to build a batch delete proposal. Other commands accept
+positional args or flags.
 
 ### Pipeline examples
 
 ```bash
-# Find events about travel and show their relationship tree
-gm ls node --type event | gm grep "travel" | gm tree --depth 2
-
-# Tag all events matching a pattern
-gm ls node | gm grep "Bangkok" | gm tag --name "thailand-trip"
+# Delete all nodes matching a search
+gm grep "deprecated" | gm rm
 gm commit <proposal-id>
 
-# Delete all archived events
-gm grep "archived" | gm rm
+# Stage multiple changes in one atomic proposal
+echo '[{"command":"add","data":{"type":"event","title":"Design review"}},
+       {"command":"add","data":{"type":"event","title":"Implementation start"}},
+       {"command":"ln","data":{"type":"followed_by","from_reference":0,"to_reference":1}}]' \
+  | gm batch
 gm commit <proposal-id>
-
-# Show event log for nodes with a specific tag
-gm find --tag "startup-idea" | gm log
-
-# List orphan tags (0 associated nodes)
-gm ls tag --orphan
 ```
 
 ---
@@ -170,7 +142,8 @@ Initialize a new graph database.
 gm init [--db <path>]
 ```
 
-Creates the database file and runs all migrations. Safe to run on existing databases (migrations are idempotent).
+Creates the database file and runs all migrations. Safe to run on existing
+databases (migrations are idempotent).
 
 ---
 
@@ -215,18 +188,6 @@ gm update apply --version v0.3.1
 
 ---
 
-### gm schema
-
-Output machine-readable schema as JSON. AI agents call this once at session start for self-discovery.
-
-```
-gm schema
-```
-
-Returns: all commands, parameters, input/output schemas, type registries.
-
----
-
 ### gm ls [entity]
 
 List entities with filters.
@@ -240,11 +201,9 @@ Entity defaults to `node` when omitted.
 | Flag | Description |
 |---|---|
 | `--type <type>` | Filter by type (node type or edge type) |
-| `--status <status>` | Filter by status |
-| `--tag <name>` | Filter nodes by tag name |
-| `--orphan` | Tags with 0 nodes, or nodes with 0 edges |
+| `--status <status>` | Filter by status (applies to `node` and `proposal`) |
 | `--limit <n>` | Max results (default 50) |
-| `--after <cursor>` | Cursor for pagination |
+| `--after <cursor>` | Cursor for pagination (pass the last item's `id`; for tags, pass the last `name`) |
 
 ```bash
 gm ls                          # list nodes (default)
@@ -263,93 +222,39 @@ gm ls proposal --status pending  # list pending proposals
 Show full detail of one entity by ID.
 
 ```
-gm cat <id> [--expand <n>]
+gm cat <id>
 ```
 
-| Flag | Description |
-|---|---|
-| `--expand <n>` | Include nodes and edges within N hops (neighborhood expansion) |
-
-Auto-detects entity type from the ID. Returns the full entity object including all properties.
+Auto-detects entity type by trying lookups in order: node → edge → tag →
+tag\_edge → proposal. Returns the full entity object including all properties.
 
 ```bash
-gm cat 019abc-...                  # show node detail
-gm cat 019abc-... --expand 2      # node + 2-hop neighborhood
+gm cat 019abc-...   # show any entity by ID
 ```
 
 ---
 
-### gm grep <pattern> [entity]
+### gm grep <pattern>
 
-Full-text search across the graph using FTS5.
+Full-text search across nodes using FTS5.
 
 ```
-gm grep <pattern> [node|edge|tag] [flags]
+gm grep <pattern> [flags]
 ```
 
-Searches titles, descriptions, and property values. Entity filter is optional — defaults to searching all entities.
+Searches node titles and descriptions using SQLite FTS5. Supports boolean
+queries (AND/OR/NOT) and phrase matching.
 
 | Flag | Description |
 |---|---|
-| `--limit <n>` | Max results |
+| `--limit <n>` | Max results (default 50) |
 | `--after <cursor>` | Cursor for pagination |
 
 ```bash
-gm grep "payment"              # search everything
-gm grep "payment" node         # search only nodes
-gm grep "API endpoint" tag     # search tag names and descriptions
-```
-
----
-
-### gm find
-
-Advanced multi-modal query. The power search command.
-
-```
-gm find [flags]
-```
-
-Combines tag matching, type filtering, and neighborhood expansion in one call.
-
-| Flag | Description |
-|---|---|
-| `--tag <name>` | Find nodes with this tag (repeatable) |
-| `--type <type>` | Filter by node type |
-| `--status <status>` | Filter by status |
-| `--text <pattern>` | FTS5 text filter |
-| `--expand <n>` | Expand N hops from matched nodes |
-| `--limit <n>` | Max results |
-| `--after <cursor>` | Cursor for pagination |
-
-Primary AI agent pattern: find anchor nodes, load surrounding context.
-
-```bash
-gm find --tag "thailand-trip" --type event --expand 2
-gm find --tag "startup-idea" --tag "David" --expand 1    # nodes with both tags
-gm find --text "conference" --status ongoing
-```
-
----
-
-### gm tree <id>
-
-Traverse the graph from a root node, displayed as a tree.
-
-```
-gm tree <id> [flags]
-```
-
-| Flag | Description |
-|---|---|
-| `--depth <n>` | Max traversal depth (default 3) |
-| `--type <edge-type>` | Only follow edges of this type |
-| `--direction <dir>` | `outgoing` (default), `incoming`, `both` |
-
-```bash
-gm tree 019abc-...                              # default tree
-gm tree 019abc-... --type caused_by --depth 5   # causal chain
-gm tree 019abc-... --direction incoming          # what caused this?
+gm grep "payment"              # simple keyword
+gm grep '"fix login"'          # exact phrase
+gm grep "auth AND token"       # boolean AND
+gm grep "pay*"                 # prefix wildcard
 ```
 
 ---
@@ -378,21 +283,9 @@ gm log --type node_created --since 7d
 
 ---
 
-### gm stat
-
-Graph statistics overview.
-
-```
-gm stat [--entity-id <id>]
-```
-
-Without arguments: total counts (nodes by type, edges by type, tags, events). With `--entity-id`: stats for a specific entity (edge count, tag count, event count).
-
----
-
 ### gm add
 
-Create an event node. Returns a pending proposal.
+Create a node. Returns a pending proposal.
 
 ```
 echo '<json>' | gm add
@@ -410,7 +303,6 @@ Input via stdin JSON (complex) or flags (simple):
 | `--where <text>` | Location |
 | `--event-time <text>` | When it happened (free-form: "2026-04-12", "last Tuesday", "summer 2025") |
 | `--status <status>` | Initial status |
-| `--property <key=value>` | Set a property (repeatable) |
 
 Stdin JSON format:
 
@@ -426,7 +318,7 @@ Stdin JSON format:
 }
 ```
 
-Returns: proposal object with proposal ID and one `create_node` operation.
+Returns: proposal object with one `create_node` operation.
 
 ```bash
 gm add --type event --title "Had dinner with David" --who "David" --where "Bangkok Kitchen"
@@ -439,7 +331,8 @@ echo '{"type":"thought","title":"Consider switching to Rust","description":"..."
 
 Create a directed edge between two entities. Returns a pending proposal.
 
-Auto-detects whether the IDs belong to nodes or tags. Both IDs must be the same entity type (both nodes or both tags).
+Auto-detects whether the IDs belong to nodes or tags. Both IDs must be the same
+entity type (both nodes or both tags).
 
 ```
 gm ln <from-id> <to-id> --type <edge-type>
@@ -448,12 +341,11 @@ gm ln <from-id> <to-id> --type <edge-type>
 | Flag | Description |
 |---|---|
 | `--type <type>` | Edge type — open string (required) |
-| `--property <key=value>` | Set a property (repeatable) |
 
-**Node edges** (event-to-event relationships):
+**Node edges** (node-to-node relationships):
 ```bash
 gm ln 019abc-... 019def-... --type caused_by
-gm ln 019abc-... 019def-... --type followed_by --property "confidence=high"
+gm ln 019abc-... 019def-... --type followed_by
 ```
 
 **Tag edges** (concept-to-concept relationships):
@@ -467,7 +359,8 @@ gm ln <tag-id> <tag-id> --type related_to
 
 ### gm tag <node-id> <tag-name>
 
-Associate a tag with a node. If the tag doesn't exist, it is created (upsert). Returns a pending proposal.
+Associate a tag with a node. If the tag doesn't exist, it is created (upsert).
+Returns a pending proposal.
 
 ```
 gm tag <node-id> <tag-name> [--description <text>]
@@ -475,26 +368,11 @@ gm tag <node-id> <tag-name> [--description <text>]
 
 | Flag | Description |
 |---|---|
-| `--description <text>` | Tag description (used on creation or update) |
-
-Pipe mode: tag all piped entities with the given tag.
+| `--description <text>` | Tag description (used on creation) |
 
 ```bash
 gm tag 019abc-... "payment"
 gm tag 019abc-... "payment" --description "Payment processing subsystem"
-
-# Pipe: tag all matching nodes
-gm ls node --type task | gm grep "billing" | gm tag --name "payment"
-```
-
----
-
-### gm untag <node-id> <tag-name>
-
-Remove a tag association from a node. Returns a pending proposal.
-
-```
-gm untag <node-id> <tag-name>
 ```
 
 ---
@@ -517,9 +395,9 @@ gm mv <id> [flags]
 | `--event-time <text>` | New event time (free-form) |
 | `--status <status>` | New status |
 | `--type <type>` | New type |
-| `--property <key=value>` | Set a property (repeatable) |
 
-Stdin JSON: partial object — only provided fields are updated.
+Stdin JSON: partial object — only provided fields are updated. Properties are
+merged: new keys are added, existing keys overwritten, unmentioned keys kept.
 
 ```bash
 gm mv 019abc-... --status resolved
@@ -537,7 +415,12 @@ Delete one or more entities. Returns a pending proposal.
 gm rm <id> [<id>...]
 ```
 
-Auto-detects entity type. Deleting a node also deletes its edges and tag associations (cascade). Multiple IDs create a single proposal with multiple operations.
+Auto-detects entity type (node, edge, or tag\_edge). Deleting a node also
+deletes its edges and tag associations (cascade). Multiple IDs create a single
+proposal with multiple operations.
+
+Accepts JSONL from stdin (`{"id":"..."}` per line) in addition to positional
+args.
 
 ```bash
 gm rm 019abc-...
@@ -551,20 +434,23 @@ gm grep "deprecated" | gm rm
 
 ### gm batch
 
-Create a multi-operation proposal from stdin JSON. The primary way to make complex atomic changes.
+Create a multi-operation proposal from stdin JSON. The primary way to make
+complex atomic changes.
 
 ```
 echo '<json>' | gm batch
 ```
 
-Stdin format: JSON array of operations. Each operation has a `command` and `data` field.
+Stdin format: JSON array of operations. Each operation has a `command` and
+`data` field. Valid commands: `add`, `ln`, `tag`, `mv`, `rm`.
 
-Within a batch, operations can reference entities created by earlier operations using `reference` (zero-based index into the operations array) instead of `id`.
+Within a batch, operations can reference entities created by earlier operations
+using `reference` (zero-based index into the operations array) instead of `id`.
 
 ```json
 [
-  {"command": "add", "data": {"type": "event", "title": "Met David at conference", "who": "David", "where": "Tech Summit 2026"}},
-  {"command": "add", "data": {"type": "person", "title": "David Chen", "description": "Startup founder, met at conference"}},
+  {"command": "add", "data": {"type": "event", "title": "Met David at conference", "who": "David"}},
+  {"command": "add", "data": {"type": "person", "title": "David Chen"}},
   {"command": "ln", "data": {"type": "involves", "from_reference": 0, "to_reference": 1}},
   {"command": "tag", "data": {"reference": 0, "tag_name": "networking"}},
   {"command": "tag", "data": {"reference": 1, "tag_name": "networking"}}
@@ -583,7 +469,9 @@ Commit a pending proposal. Applies all operations atomically.
 gm commit <proposal-id>
 ```
 
-Re-validates all operations against the current graph state before applying. If the graph has changed in a way that makes an operation invalid, the entire commit is rejected.
+Re-validates all operations against the current graph state before applying.
+If any operation fails (cycle detection, missing entity, etc.), the entire
+commit is rolled back and the graph is unchanged.
 
 ---
 
@@ -597,7 +485,45 @@ gm reject <proposal-id>
 
 ---
 
-### gm merge <tag-id> <tag-id>
+## Planned Commands
+
+The following commands are designed but **not yet implemented**. Do not use
+them in scripts or agent loops — they will return a "command not found" error.
+
+### gm find *(planned)*
+
+Advanced multi-modal query combining tag matching, type filtering, and
+neighborhood expansion.
+
+```
+gm find --tag <name> [--type <type>] [--status <status>] [--text <pattern>] [--expand <n>]
+```
+
+### gm tree <id> *(planned)*
+
+Traverse the graph from a root node up to `--depth` hops.
+
+```
+gm tree <id> [--depth <n>] [--type <edge-type>] [--direction outgoing|incoming|both]
+```
+
+### gm stat *(planned)*
+
+Graph statistics overview: total counts by type, orphan detection.
+
+```
+gm stat [--entity-id <id>]
+```
+
+### gm untag <node-id> <tag-name> *(planned)*
+
+Remove a tag association from a node. Returns a pending proposal.
+
+```
+gm untag <node-id> <tag-name>
+```
+
+### gm merge <tag-id> <tag-id> *(planned)*
 
 Merge two tags into one. Returns a pending proposal.
 
@@ -605,30 +531,28 @@ Merge two tags into one. Returns a pending proposal.
 gm merge <tag-id> <tag-id> [--keep first|second]
 ```
 
-The `--keep` flag determines which tag survives (default: `first`). All node associations from the removed tag are transferred to the surviving tag.
+### gm gc *(planned)*
 
----
-
-### gm gc
-
-Find orphan entities — tags with 0 node associations, nodes with 0 edges. Read-only; reports findings but does not create proposals.
+Find orphan entities (tags with 0 node associations, nodes with 0 edges).
 
 ```
 gm gc [--entity node|tag]
 ```
 
-Pipe the output to `gm rm` to create a cleanup proposal:
+### gm schema *(planned)*
 
-```bash
-gm gc --entity tag | gm rm
-gm commit <proposal-id>
+Output machine-readable command/type schema as JSON for AI agent self-discovery.
+
+```
+gm schema
 ```
 
 ---
 
 ## Proposal Flow
 
-All write commands (`add`, `ln`, `tag`, `untag`, `mv`, `rm`, `batch`, `merge`) create **pending proposals**. No direct graph mutation.
+All write commands (`add`, `ln`, `tag`, `mv`, `rm`, `batch`) create **pending
+proposals**. No direct graph mutation occurs.
 
 ```
 Write command → validate → create pending proposal → return proposal
@@ -636,17 +560,20 @@ Human confirms → AI calls gm commit → re-validate → apply atomically
 Human rejects → AI calls gm reject → discard
 ```
 
-A write command's response includes the proposal ID and a summary of operations:
+A write command's response includes the proposal ID and a summary of
+operations:
 
 ```json
 {
   "ok": true,
   "data": {
-    "proposal_id": "019abc-...",
+    "id": "019abc-...",
     "status": "pending",
     "operations": [
       {"action": "create_node", "entity": "node", "summary": "event: Had dinner with David"}
-    ]
+    ],
+    "created_at": "2026-05-15T10:30:00.000Z",
+    "updated_at": "2026-05-15T10:30:00.000Z"
   }
 }
 ```
@@ -658,16 +585,15 @@ A write command's response includes the proposal ID and a summary of operations:
 | Flag | Default | Description |
 |---|---|---|
 | `--db <path>` | `.graphmind/graph.db` | Path to SQLite database |
-| `--quiet` | `false` | Suppress stdout, exit code only |
-| `--pretty` | `false` | Pretty-print JSON |
-| `--jsonl` | auto | Force JSONL output |
-| `--envelope` | auto | Force envelope output |
+| `--quiet` | `false` | Suppress stdout; rely on exit code only |
+| `--pretty` | `false` | Pretty-print JSON output |
 
 ---
 
 ## Open Type System
 
-Node types and edge types are **open strings** — not enumerated, not validated. The AI agent decides what types to use based on context.
+Node types and edge types are **open strings** — not enumerated, not validated.
+The AI agent decides what types to use based on context.
 
 ### Node type examples (not exhaustive)
 
@@ -702,4 +628,5 @@ Node types and edge types are **open strings** — not enumerated, not validated
 | `related_to` | A and B are conceptually related |
 | `opposite_of` | A and B are opposing concepts |
 
-The AI agent is free to invent new types as needed. Consistency is encouraged through `next_steps` hints, not enforced through validation.
+The AI agent is free to invent new types as needed. Consistency is encouraged
+through `next_steps` hints, not enforced through validation.
