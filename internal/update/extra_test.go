@@ -103,9 +103,9 @@ func TestApplyWithVersionWithoutVPrefix(t *testing.T) {
 					},
 				},
 			}
-			json.NewEncoder(w).Encode(release)
+			json.NewEncoder(w).Encode(release) //nolint:errcheck
 		case "/bin":
-			w.Write(archive)
+			_, _ = w.Write(archive)
 		}
 	}))
 	defer server.Close()
@@ -443,7 +443,7 @@ func TestParseAssetDigestEdgeCases(t *testing.T) {
 func TestGetReleaseNon200(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("not found"))
+		_, _ = w.Write([]byte("not found"))
 	}))
 	defer server.Close()
 

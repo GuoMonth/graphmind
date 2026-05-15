@@ -423,7 +423,7 @@ func TestAddNodeMissingType(t *testing.T) {
 	}
 }
 
-func TestAddNodeViaStin(t *testing.T) {
+func TestAddNodeViaStdin(t *testing.T) {
 	setupCLI(t)
 
 	// Provide input via stdin pipe
